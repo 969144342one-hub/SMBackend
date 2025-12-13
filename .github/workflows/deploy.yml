@@ -1,0 +1,145 @@
+name: Deploy Express Lambda
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  AWS_REGION: eu-central-1
+  NODE_VERSION: '20'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Clear npm cache
+        run: npm cache clean --force
+      
+      - name: Remove lock file and node_modules
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Run tests
+        run: npm test
+
+  deploy-dev:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Clear npm cache
+        run: npm cache clean --force
+      
+      - name: Remove lock file and node_modules
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Install Serverless Framework
+        run: npm install -g serverless
+      
+      - name: Deploy to Development
+        run: |
+          echo "Deploying to development..."
+          serverless deploy --stage dev --verbose
+      
+      - name: Get API URL and Test
+        if: success()
+        run: |
+          echo "=== Deployment Info ==="
+          serverless info --stage dev
+          
+          echo "=== Testing API ==="
+          API_URL=$(serverless info --stage dev 2>/dev/null | grep -oE 'https://[a-zA-Z0-9.-]+\.execute-api\.[a-zA-Z0-9.-]+\.amazonaws\.com/[a-zA-Z0-9.-]+' | head -n1)
+          
+          if [ ! -z "$API_URL" ]; then
+            echo "Found API URL: $API_URL"
+            
+            # Test health endpoint
+            echo "Testing /health endpoint..."
+            curl -s -f "$API_URL/health" && echo "✅ Health endpoint works"
+            
+            # Test root endpoint
+            echo "Testing root endpoint..."
+            curl -s -f "$API_URL/" && echo "✅ Root endpoint works"
+          else
+            echo "⚠️ Could not extract API URL from deployment info"
+          fi
+
+  deploy-prod:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Clear npm cache
+        run: npm cache clean --force
+      
+      - name: Remove lock file and node_modules
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
+      
+      - name: Install dependencies
+        run: npm install
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Install Serverless Framework
+        run: npm install -g serverless
+      
+      - name: Deploy to Production
+        run: |
+          echo "Deploying to production..."
+          serverless deploy --stage prod --verbose
+      
+      - name: Show deployment info
+        if: success()
+        run: |
+          echo "🎉 Production deployment successful!"
+          echo "================================="
+          serverless info --stage prod
