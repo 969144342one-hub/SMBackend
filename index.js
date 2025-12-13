@@ -20,8 +20,7 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
   .map((s) => s.trim())
   .filter(Boolean);
 
-const MONGO_URI =
-  process.env.MONGO_URI || "mongodb://127.0.0.1:27017/SattaMatka";
+const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/SattaMatka";
 
 // --- Middleware ---
 app.use(express.json({ limit: "50mb" }));
@@ -30,7 +29,6 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(
   cors({
     origin: function (origin, cb) {
-      // Allow requests with no origin (like Postman, mobile apps)
       if (!origin || ALLOWED_ORIGINS.includes(origin)) {
         return cb(null, true);
       }
@@ -44,11 +42,23 @@ app.use(
 app.use(myMiddleware);
 
 // --- Health Check ---
-app.get("/api/health", (req, res) =>
-  res.json({ ok: true, time: new Date().toISOString() })
+app.get("/", (req, res) => 
+  res.json({ 
+    message: "Satta Matka API is running!",
+    mongodb_status: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    time: new Date().toISOString() 
+  })
 );
 
-// Example Todo (Not required but kept)
+app.get("/api/health", (req, res) =>
+  res.json({ 
+    ok: true, 
+    mongodb_connected: mongoose.connection.readyState === 1,
+    time: new Date().toISOString() 
+  })
+);
+
+// Example Todo Schema
 const TodoSchema = new mongoose.Schema(
   { text: String, done: Boolean },
   { timestamps: true }
@@ -60,21 +70,28 @@ app.use("/user", userRoutes);
 app.use("/AllGames", AllGames);
 app.use("/Notification", notiFection);
 
-// --- MongoDB Connect + Start Server ---
-mongoose
-  .connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
-    console.log(`✅ MongoDB connected: ${MONGO_URI}`);
-
-    // Start server ONLY after successful DB connection
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
-    });
-  })
-  .catch((err) => {
+// --- MongoDB Connect (FIXED - No deprecated options) ---
+const connectDB = async () => {
+  try {
+    if (mongoose.connection.readyState === 0) {
+      await mongoose.connect(MONGO_URI);  // ✅ Clean connection - no deprecated options
+      console.log(`✅ MongoDB connected: ${MONGO_URI}`);
+    }
+  } catch (err) {
     console.error("❌ MongoDB connection error:", err.message);
-    process.exit(1);
+    throw err;
+  }
+};
+
+// Connect to MongoDB for Lambda
+connectDB();
+
+// For local development
+if (process.env.NODE_ENV !== 'production' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running at http://0.0.0.0:${PORT}`);
   });
+}
+
+// Export for Lambda (CommonJS compatible)
+export default app;
