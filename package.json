@@ -4,11 +4,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon server.js",
-    "start": "node server.js",
-    "dev:serverless": "serverless offline start",
+    "start": "node index.js",
+    "dev": "serverless offline",
     "deploy": "serverless deploy",
-    "test": "echo \"No tests specified\" && exit 0"
+    "cleanup": "./scripts/cleanup-failed-stacks.sh"
   },
   "author": "",
   "license": "ISC",
