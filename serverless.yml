@@ -1,6 +1,6 @@
 service: express-lambda-app
 
-frameworkVersion: "~4.28.0"
+frameworkVersion: '3'
 
 provider:
   name: aws
@@ -24,28 +24,15 @@ provider:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-          Resource:
-            - arn:aws:logs:${aws:region}:${aws:accountId}:log-group:/aws/lambda/*:*:*
+          Resource: arn:aws:logs:*:*:*
 
 functions:
   api:
     handler: src/lambda.handler
-    url:
-      cors:
-        allowOrigins:
-          - "*"
-        allowHeaders:
-          - Content-Type
-          - Authorization
-        allowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-    environment:
-      FUNCTION_URL: true
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
 
 plugins:
   - serverless-offline
@@ -53,4 +40,3 @@ plugins:
 custom:
   serverless-offline:
     httpPort: 3000
-    host: 0.0.0.0
