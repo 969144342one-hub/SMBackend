@@ -1,22 +1,18 @@
 service: express-lambda-app
 
-frameworkVersion: '4'
+frameworkVersion: "~4.28.0"
 
 provider:
   name: aws
   runtime: nodejs20.x
   region: ap-south-1
-  stage: ${opt:stage, 'prod'}
+  stage: ${opt:stage, 'dev'}
   memorySize: 512
-  timeout: 30
-
-  deploymentBucket:
-    name: express-lambda-app-deploy-bucket-ap-south-1
-    serverSideEncryption: AES256
+  timeout: 900
 
   environment:
     NODE_ENV: ${self:provider.stage}
-    JWT_SECRET: ${env:JWT_SECRET}
+    JWT_SECRET: ${env:JWT_SECRET, 'default-jwt-secret'}
     JWT_EXPIRES_IN: ${env:JWT_EXPIRES_IN, '24h'}
     LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
 
@@ -24,7 +20,19 @@ functions:
   api:
     handler: src/lambda.handler
     url:
-      cors: true
+      cors:
+        allowedOrigins:
+          - '*'
+        allowedHeaders:
+          - Content-Type
+          - Authorization
+        allowedMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
 
 plugins:
   - serverless-offline
@@ -32,3 +40,5 @@ plugins:
 custom:
   serverless-offline:
     httpPort: 3000
+    host: 0.0.0.0
+    printOutput: true
