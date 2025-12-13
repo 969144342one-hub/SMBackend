@@ -20,7 +20,8 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
   .map((s) => s.trim())
   .filter(Boolean);
 
-const MONGO_URI = process.env.MONGO_URI || "mongodb://127.0.0.1:27017/SattaMatka";
+const MONGO_URI =
+  "mongodb+srv://abhishek:abhishek@cluster0.0usngiq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0" || "mongodb://127.0.0.1:27017/SattaMatka";
 
 // --- Middleware ---
 app.use(express.json({ limit: "50mb" }));
