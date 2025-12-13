@@ -22,16 +22,8 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Clear npm cache
-        run: npm cache clean --force
-
-      - name: Remove lock file and node_modules
-        run: |
-          rm -rf node_modules
-          rm -f package-lock.json
-
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -50,7 +42,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -59,10 +51,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install Serverless Framework
-        run: npm install -g serverless
+      - name: Install Serverless
+        run: npm install -g serverless@4
 
-      - name: Deploy to Development
+      - name: Deploy to DEV
         run: serverless deploy --stage dev --verbose
 
   deploy-prod:
@@ -80,7 +72,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -89,10 +81,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install Serverless Framework
-        run: npm install -g serverless
+      - name: Install Serverless
+        run: npm install -g serverless@4
 
-      - name: Deploy to Production
+      - name: Deploy to PROD
         run: serverless deploy --stage prod --verbose
 
       - name: Show deployment info
