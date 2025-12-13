@@ -8,46 +8,23 @@ provider:
   region: ap-south-1
   stage: ${opt:stage, 'prod'}
   memorySize: 512
-  timeout: 900
+  timeout: 30
 
   deploymentBucket:
     name: express-lambda-app-deploy-bucket-ap-south-1
+    serverSideEncryption: AES256
 
   environment:
     NODE_ENV: ${self:provider.stage}
-    JWT_SECRET: ${env:JWT_SECRET, 'fallback-secret-key'}
+    JWT_SECRET: ${env:JWT_SECRET}
     JWT_EXPIRES_IN: ${env:JWT_EXPIRES_IN, '24h'}
     LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
-
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-          Resource: arn:aws:logs:*:*:*
 
 functions:
   api:
     handler: src/lambda.handler
     url:
-      cors:
-        allowOrigins:
-          - '*'
-        allowHeaders:
-          - Content-Type
-          - Authorization
-        allowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-    environment:
-      FUNCTION_URL: true
+      cors: true
 
 plugins:
   - serverless-offline
@@ -55,5 +32,3 @@ plugins:
 custom:
   serverless-offline:
     httpPort: 3000
-    host: 0.0.0.0
-    printOutput: true
