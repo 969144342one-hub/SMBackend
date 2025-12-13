@@ -1,6 +1,6 @@
 service: express-lambda-app
 
-frameworkVersion: '4'
+frameworkVersion: "~4.28.0"
 
 provider:
   name: aws
@@ -25,11 +25,11 @@ provider:
             - logs:CreateLogStream
             - logs:PutLogEvents
           Resource:
-            - arn:aws:logs:${aws:region}:${aws:accountId}:*
+            - arn:aws:logs:*:*:*
 
 functions:
   api:
-    handler: lambda.handler
+    handler: src/lambda.handler
     url:
       cors:
         allowedOrigins:
@@ -44,3 +44,4 @@ functions:
           - DELETE
           - PATCH
           - OPTIONS
+        maxAge: 86400

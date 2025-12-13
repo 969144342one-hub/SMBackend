@@ -3,8 +3,6 @@ name: Deploy Express Lambda
 on:
   push:
     branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
 
 env:
   AWS_REGION: eu-central-1
@@ -12,71 +10,51 @@ env:
   SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
 
 jobs:
-  deploy:
+  deploy-dev:
+    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Install Serverless Framework
-        run: npm install -g serverless@4
-
-      - name: Deploy
-        run: |
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            serverless deploy --stage prod --verbose
-          else
-            serverless deploy --stage dev --verbose
-          fi
-
-      - name: Show deployment info
-        run: serverless info --verbose
-
-  deploy-prod:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm install
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install Serverless
-        run: npm install -g serverless@4
+      - run: npm install -g serverless@4
 
-      - name: Deploy to PROD
-        run: serverless deploy --stage prod --verbose
+      - run: serverless deploy --stage dev --verbose
 
-      - name: Show deployment info
-        run: serverless info --stage prod
+
+  deploy-prod:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - run: npm install
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - run: npm install -g serverless@4
+
+      - run: serverless deploy --stage prod --verbose
+
+      - run: serverless info --stage prod
