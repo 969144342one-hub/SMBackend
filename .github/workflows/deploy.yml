@@ -9,6 +9,7 @@ env:
   NODE_VERSION: '20'
   SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
   JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  MONGO_URI: ${{ secrets.MONGO_URI }}
 
 jobs:
   deploy:
@@ -21,9 +22,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          echo "Installing all dependencies..."
+          npm ci
+          echo "Dependencies installed:"
+          npm list --depth=0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -32,37 +38,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install Serverless and AWS CLI
-        run: |
-          npm install -g serverless@4.28.0
-          pip install awscli
+      - name: Install Serverless Framework
+        run: npm install -g serverless@4.28.0
 
-      - name: Check and cleanup failed stack
+      - name: Clean up failed stacks
         run: |
-          STACK_NAME="express-lambda-app-prod"
-          STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region ${{ env.AWS_REGION }} --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+          STACK_NAME="satta-matka-api-prod"
           
-          echo "Current stack status: $STACK_STATUS"
-          
-          if [ "$STACK_STATUS" = "DELETE_FAILED" ]; then
-            echo "Stack is in DELETE_FAILED state. Attempting to delete..."
-            aws cloudformation delete-stack --stack-name $STACK_NAME --region ${{ env.AWS_REGION }}
+          if aws cloudformation describe-stacks --stack-name $STACK_NAME --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            STACK_STATUS=$(aws cloudformation describe-stacks --stack-name $STACK_NAME --region ${{ env.AWS_REGION }} --query 'Stacks[0].StackStatus' --output text)
+            echo "Stack status: $STACK_STATUS"
             
-            echo "Waiting for stack deletion to complete..."
-            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region ${{ env.AWS_REGION }} || true
-            
-            # Wait a bit more to ensure cleanup
-            sleep 30
-          elif [ "$STACK_STATUS" = "DELETE_IN_PROGRESS" ]; then
-            echo "Stack deletion in progress. Waiting..."
-            aws cloudformation wait stack-delete-complete --stack-name $STACK_NAME --region ${{ env.AWS_REGION }}
+            if [ "$STACK_STATUS" = "DELETE_FAILED" ] || [ "$STACK_STATUS" = "CREATE_FAILED" ]; then
+              echo "Attempting to delete failed stack..."
+              aws cloudformation delete-stack --stack-name $STACK_NAME --region ${{ env.AWS_REGION }}
+              sleep 60
+            fi
           fi
 
       - name: Deploy to AWS Lambda
-        run: serverless deploy --stage prod --verbose
-
-      - name: Deployment Status
-        if: failure()
         run: |
-          echo "Deployment failed. Running with debug for more info..."
-          serverless deploy --stage prod --debug
+          echo "Starting serverless deployment..."
+          serverless deploy --stage prod --verbose
+
+      - name: Display deployment info
+        run: |
+          echo "Deployment completed!"
+          serverless info --stage prod
