@@ -2,59 +2,40 @@ name: Deploy Express Lambda
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 env:
   AWS_REGION: ap-south-1
-  NODE_VERSION: "20"
+  NODE_VERSION: '20'
   SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
 
 jobs:
-  deploy-dev:
+  deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - run: npm install -g serverless
+      - name: Install Serverless
+        run: npm install -g serverless@4
 
-      - run: serverless deploy --stage dev --verbose
+      - name: Deploy (update existing stack)
+        run: serverless deploy --stage prod --verbose
 
-  deploy-prod:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - run: npm install
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - run: npm install -g serverless
-
-      - run: serverless deploy --stage prod --verbose
-
-      - run: serverless info --stage prod
+      - name: Show info
+        run: serverless info --stage prod
