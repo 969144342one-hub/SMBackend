@@ -1,0 +1,144 @@
+{
+  "D:\\AdminNIstant Project\\SMBackend\\SMBackendCode-main\\SMBackendCode-main\\serverless.yml": {
+    "versionFramework": "4.28.0",
+    "servicePath": "D:\\AdminNIstant Project\\SMBackend\\SMBackendCode-main\\SMBackendCode-main\\serverless.yml",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "service": "express-lambda-app",
+      "provider": {
+        "name": "aws",
+        "runtime": "nodejs20.x",
+        "region": "ap-south-1",
+        "stage": "dev",
+        "memorySize": 512,
+        "timeout": 900,
+        "environment": {
+          "NODE_ENV": "${self:provider.stage}",
+          "JWT_SECRET": "<REDACTED>",
+          "JWT_EXPIRES_IN": "${env:JWT_EXPIRES_IN, '24h'}",
+          "LOG_LEVEL": "${env:LOG_LEVEL, 'info'}"
+        },
+        "iam": {
+          "role": {
+            "statements": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "logs:CreateLogGroup",
+                  "logs:CreateLogStream",
+                  "logs:PutLogEvents"
+                ],
+                "Resource": [
+                  "arn:aws:logs:${aws:region}:${aws:accountId}:log-group:/aws/lambda/*:*:*"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "functions": {
+        "api": {
+          "handler": "src/lambda.handler",
+          "url": {
+            "cors": {
+              "allowCredentials": "<REDACTED>",
+              "allowHeaders": [
+                "Content-Type",
+                "X-Amz-Date",
+                "Authorization",
+                "X-Api-Key",
+                "X-Amz-Security-Token",
+                "X-Amz-User-Agent",
+                "X-Requested-With"
+              ],
+              "allowMethods": [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+                "OPTIONS"
+              ],
+              "allowOrigins": [
+                "*"
+              ],
+              "exposeHeaders": [
+                "Date",
+                "X-Amz-Request-Id"
+              ],
+              "maxAge": 86400
+            }
+          },
+          "environment": {
+            "FUNCTION_URL": true
+          }
+        }
+      },
+      "plugins": [
+        "serverless-offline"
+      ],
+      "custom": {
+        "serverless-offline": {
+          "httpPort": 3000,
+          "host": "0.0.0.0",
+          "prefix": "",
+          "printOutput": true
+        }
+      }
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "ap-south-1",
+      "stage": "dev",
+      "memorySize": 512,
+      "timeout": 900,
+      "environment": {
+        "NODE_ENV": "${self:provider.stage}",
+        "JWT_SECRET": "<REDACTED>",
+        "JWT_EXPIRES_IN": "${env:JWT_EXPIRES_IN, '24h'}",
+        "LOG_LEVEL": "${env:LOG_LEVEL, 'info'}"
+      },
+      "iam": {
+        "role": {
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+              ],
+              "Resource": [
+                "arn:aws:logs:${aws:region}:${aws:accountId}:log-group:/aws/lambda/*:*:*"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "dashboard": {
+      "isEnabledForService": false,
+      "requiredAuthentication": true,
+      "orgFeaturesInUse": null,
+      "orgObservabilityIntegrations": null,
+      "serviceAppId": null,
+      "serviceProvider": null,
+      "instanceParameters": null
+    },
+    "serviceRawFile": "service: express-lambda-app\r\n\r\nprovider:\r\n  name: aws\r\n  runtime: nodejs20.x\r\n  region: ap-south-1\r\n  stage: ${opt:stage, 'dev'}\r\n  memorySize: 512\r\n  timeout: 900\r\n  environment:\r\n    NODE_ENV: ${self:provider.stage}\r\n    JWT_SECRET: ${env:JWT_SECRET, 'fallback-secret-key'}\r\n    JWT_EXPIRES_IN: ${env:JWT_EXPIRES_IN, '24h'}\r\n    LOG_LEVEL: ${env:LOG_LEVEL, 'info'}\r\n  \r\n  iam:\r\n    role:\r\n      statements:\r\n        - Effect: Allow\r\n          Action:\r\n            - logs:CreateLogGroup\r\n            - logs:CreateLogStream\r\n            - logs:PutLogEvents\r\n          Resource: \r\n            - 'arn:aws:logs:${aws:region}:${aws:accountId}:log-group:/aws/lambda/*:*:*'\r\n\r\nfunctions:\r\n  api:\r\n    handler: src/lambda.handler\r\n    url:\r\n      cors:\r\n        allowCredentials: false\r\n        allowHeaders:\r\n          - Content-Type\r\n          - X-Amz-Date\r\n          - Authorization\r\n          - X-Api-Key\r\n          - X-Amz-Security-Token\r\n          - X-Amz-User-Agent\r\n          - X-Requested-With\r\n        allowMethods:\r\n          - GET\r\n          - POST\r\n          - PUT\r\n          - DELETE\r\n          - PATCH\r\n          - OPTIONS\r\n        allowOrigins:\r\n          - '*'\r\n        exposeHeaders:\r\n          - Date\r\n          - X-Amz-Request-Id\r\n        maxAge: 86400\r\n    environment:\r\n      FUNCTION_URL: true\r\n\r\nplugins:\r\n  - serverless-offline\r\n\r\ncustom:\r\n  serverless-offline:\r\n    httpPort: 3000\r\n    host: 0.0.0.0\r\n    prefix: ''\r\n    printOutput: true",
+    "command": [
+      "login"
+    ],
+    "options": {},
+    "orgId": "ba2e85f9-7e4e-4335-a2de-622ef58ecccf",
+    "orgName": "mukeshrai",
+    "userId": "tM72k3ZmD5PnzXBHwW",
+    "userName": "mukeshrai",
+    "serviceProviderAwsCfStackId": null,
+    "serviceProviderAwsCfStackCreated": null,
+    "serviceProviderAwsCfStackUpdated": null,
+    "serviceProviderAwsCfStackStatus": null,
+    "serviceProviderAwsCfStackOutputs": null
+  }
+}

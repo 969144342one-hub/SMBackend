@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",d:\mern-server\serverless.yml d:\mern-server\lambda.js
+    "start": "node server.js",
     "dev:serverless": "serverless offline start",
     "deploy": "serverless deploy",
     "test": "echo \"No tests specified\" && exit 0"
@@ -14,7 +14,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "backend": "file:",
+    "@vendia/serverless-express": "^4.12.6",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
