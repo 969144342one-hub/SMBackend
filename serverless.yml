@@ -1,14 +1,17 @@
 service: express-lambda-app
 
-frameworkVersion: "~4.28.0"
+frameworkVersion: "4"
 
 provider:
   name: aws
   runtime: nodejs20.x
-  region: eu-central-1
+  region: ap-south-1
   stage: ${opt:stage, 'dev'}
   memorySize: 512
   timeout: 30
+
+  deploymentBucket:
+    name: express-lambda-app-deployments-ap-south-1
 
   environment:
     NODE_ENV: ${self:provider.stage}
@@ -24,8 +27,7 @@ provider:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-          Resource:
-            - arn:aws:logs:*:*:*
+          Resource: "*"
 
 functions:
   api:
@@ -33,15 +35,10 @@ functions:
     url:
       cors:
         allowedOrigins:
-          - '*'
+          - "*"
         allowedHeaders:
           - Content-Type
           - Authorization
         allowedMethods:
           - GET
           - POST
-          - PUT
-          - DELETE
-          - PATCH
-          - OPTIONS
-        maxAge: 86400

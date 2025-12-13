@@ -5,14 +5,14 @@ on:
     branches: [ main, develop ]
 
 env:
-  AWS_REGION: eu-central-1
-  NODE_VERSION: '20'
+  AWS_REGION: ap-south-1
+  NODE_VERSION: "20"
   SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
 
 jobs:
   deploy-dev:
-    if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
 
     steps:
       - uses: actions/checkout@v4
@@ -29,14 +29,14 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - run: npm install -g serverless@4
+      - run: npm install -g serverless
 
       - run: serverless deploy --stage dev --verbose
 
-
   deploy-prod:
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - run: npm install -g serverless@4
+      - run: npm install -g serverless
 
       - run: serverless deploy --stage prod --verbose
 
