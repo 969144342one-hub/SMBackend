@@ -1,5 +1,5 @@
 import serverless from 'serverless-http';
-import app from './index';
+const app = require('./indexd.js');
 
 // Wrap the Express app with serverless-http
 export const handler = serverless(app);
