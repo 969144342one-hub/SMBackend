@@ -55,9 +55,10 @@ functions:
       FUNCTION_URL: true
 
 plugins:
-  - serverless-offline
+  - ${self:custom.offlinePlugin, ''}
 
 custom:
+  offlinePlugin: ${env:USE_OFFLINE, ''}
   serverless-offline:
     httpPort: 3000
     host: 0.0.0.0
