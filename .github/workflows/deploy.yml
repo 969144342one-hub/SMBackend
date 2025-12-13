@@ -2,7 +2,7 @@ name: Deploy Express Lambda
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 env:
   AWS_REGION: ap-south-1
@@ -11,48 +11,29 @@ env:
   JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
 jobs:
-  deploy-dev:
+  deploy:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
 
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm install
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - run: npm install -g serverless
+      - name: Install Serverless
+        run: npm install -g serverless@4.28.0
 
-      - run: serverless deploy --stage dev --verbose
-
-  deploy-prod:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - run: npm install
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - run: npm install -g serverless
-
-      - run: serverless deploy --stage prod --verbose
+      - name: Deploy to AWS Lambda
+        run: serverless deploy --stage prod --verbose

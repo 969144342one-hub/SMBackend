@@ -1,14 +1,13 @@
 service: express-lambda-app
-
 frameworkVersion: "~4.28.0"
 
 provider:
   name: aws
   runtime: nodejs20.x
   region: ap-south-1
-  stage: ${opt:stage, 'dev'}
+  stage: ${opt:stage, 'prod'}
   memorySize: 512
-  timeout: 900
+  timeout: 30
 
   environment:
     NODE_ENV: ${self:provider.stage}
@@ -16,13 +15,23 @@ provider:
     JWT_EXPIRES_IN: ${env:JWT_EXPIRES_IN, '24h'}
     LOG_LEVEL: ${env:LOG_LEVEL, 'info'}
 
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "*"
+
 functions:
   api:
     handler: src/lambda.handler
     url:
       cors:
         allowedOrigins:
-          - '*'
+          - "*"
         allowedHeaders:
           - Content-Type
           - Authorization
@@ -34,11 +43,4 @@ functions:
           - PATCH
           - OPTIONS
 
-plugins:
-  - serverless-offline
-
-custom:
-  serverless-offline:
-    httpPort: 3000
-    host: 0.0.0.0
-    printOutput: true
+plugins: []
