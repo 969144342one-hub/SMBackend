@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
-  "http://localhost:5173,https://main.d3ezir7xehgqkb.amplifyapp.com/")
+  "http://localhost:5173,https://main.d1osaocppprg4.amplifyapp.com")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);

@@ -1,0 +1,84 @@
+{
+  "D:\\AdminNIstant Project\\SMBackend\\SMBackendCode-main\\SMBackendCode-main\\serverless.yml": {
+    "versionFramework": "4.28.0",
+    "servicePath": "D:\\AdminNIstant Project\\SMBackend\\SMBackendCode-main\\SMBackendCode-main\\serverless.yml",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "service": "express-lambda-app",
+      "frameworkVersion": "4",
+      "provider": {
+        "name": "aws",
+        "runtime": "nodejs20.x",
+        "region": "ap-south-1",
+        "stage": "dev",
+        "stackTags": {
+          "Environment": "${self:provider.stage}",
+          "Project": "express-lambda-app",
+          "ManagedBy": "serverless"
+        },
+        "environment": {
+          "JWT_SECRET": "<REDACTED>",
+          "NODE_ENV": "${self:provider.stage}"
+        }
+      },
+      "functions": {
+        "app": {
+          "handler": "lambda.handler",
+          "events": [
+            {
+              "http": {
+                "path": "/{proxy+}",
+                "method": "ANY",
+                "cors": true
+              }
+            },
+            {
+              "http": {
+                "path": "/",
+                "method": "ANY",
+                "cors": true
+              }
+            }
+          ]
+        }
+      },
+      "plugins": [
+        "serverless-offline"
+      ],
+      "custom": {
+        "serverless-offline": {
+          "httpPort": 3000
+        }
+      }
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs20.x",
+      "region": "ap-south-1",
+      "stage": "dev",
+      "stackTags": {
+        "Environment": "${self:provider.stage}",
+        "Project": "express-lambda-app",
+        "ManagedBy": "serverless"
+      },
+      "environment": {
+        "JWT_SECRET": "<REDACTED>",
+        "NODE_ENV": "${self:provider.stage}"
+      }
+    },
+    "error": {
+      "message": "Unauthorized",
+      "code": "AUTH_FAILED"
+    },
+    "serviceRawFile": "service: express-lambda-app\r\n\r\nframeworkVersion: '4'\r\n\r\nprovider:\r\n  name: aws\r\n  runtime: nodejs20.x\r\n  region: ${env:AWS_REGION, 'ap-south-1'}\r\n  stage: ${opt:stage, 'dev'}\r\n  \r\n  stackTags:\r\n    Environment: ${self:provider.stage}\r\n    Project: express-lambda-app\r\n    ManagedBy: serverless\r\n  \r\n  environment:\r\n    JWT_SECRET: ${env:JWT_SECRET}\r\n    NODE_ENV: ${self:provider.stage}\r\n\r\nfunctions:\r\n  app:\r\n    handler: lambda.handler\r\n    events:\r\n      - http:\r\n          path: /{proxy+}\r\n          method: ANY\r\n          cors: true\r\n      - http:\r\n          path: /\r\n          method: ANY\r\n          cors: true\r\n\r\nplugins:\r\n  - serverless-offline\r\n\r\ncustom:\r\n  serverless-offline:\r\n    httpPort: 3000",
+    "command": [
+      "offline"
+    ],
+    "options": {},
+    "serviceProviderAwsCfStackId": null,
+    "serviceProviderAwsCfStackCreated": null,
+    "serviceProviderAwsCfStackUpdated": null,
+    "serviceProviderAwsCfStackStatus": null,
+    "serviceProviderAwsCfStackOutputs": null
+  }
+}
