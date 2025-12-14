@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const DataBaseConnect = async () => {
   try {
     // Get connection string from environment variables
-    const uri = "mongodb+srv://dengeramprkash:dengeramprkash@cluster0.0usngiq.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+    const uri = process.env.MONGO_URI;
 
     if (!uri) {
       throw new Error("MONGO_URI is not defined in environment variables");
