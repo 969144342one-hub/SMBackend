@@ -1,7 +1,7 @@
 import express from "express";
 import fetch from "node-fetch";
 import jwt from "jsonwebtoken";
-import { AllGames } from "../Module.js";
+import { AllGames, endPointSchemaUrl } from "../Module.js";
 import dayjs from "dayjs";
 
 // import { JWT_SECRET } from "../config.js"
@@ -214,6 +214,86 @@ router.post("/updateGamesData", async (req, res) => {
   }
 });
 
+// router.post("/endpoints", async (req, res) => {
+//   try {
+//     const { url, ArrayOfGames, Active } = req.body;
+
+//     // Validate
+//     if (!url || !ArrayOfGames || ArrayOfGames.length === 0) {
+//       return res
+//         .status(400)
+//         .json({ message: "URL and games are required" });
+//     }
+
+//     // Update existing record by URL, or insert if not found
+//     const updatedDoc = await endPointSchemaUrl.findOneAndUpdate(
+//       { url }, // filter: find by URL
+//       { ArrayOfGames, Active }, // fields to update
+//       { new: true, upsert: true } // return updated doc, create if not exists
+//     );
+
+//     res.status(200).json({
+//       success: true,
+//       data: updatedDoc,
+//       message: "Url and Games updated successfully",
+//     });
+//   } catch (err) {
+//     console.error(err);
+//     return res.status(500).json({ message: "Server error" });
+//   }
+// });
+
+router.post("/endpoints", async (req, res) => {
+  try {
+    const { url, ArrayOfGames, enabled } = req.body;
+    console.log(enabled);
+
+    // Use an empty filter {} to find the single existing record
+    const updatedDoc = await endPointSchemaUrl.findOneAndUpdate(
+      {}, // Empty filter: finds the first document in the collection
+      {
+        $addToSet: { ArrayOfGames: { $each: ArrayOfGames } },
+        $set: {
+          enabled: enabled,
+          url: url,
+        },
+      },
+      {
+        new: true, // Return the modified document
+        upsert: true, // If the table is empty, create the first record
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedDoc,
+      message: "Record updated successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/getGamesAndUrl", async (req, res) => {
+  try {
+    const data = await endPointSchemaUrl.find(); // ✅ await the query
+
+    res.status(200).json({
+      success: true,
+      data: data,
+      message: "Data sent successfully",
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false, // ✅ should be false on error
+      message: "Something went wrong.",
+    });
+  }
+});
+
 router.put("/updatePayment/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -272,7 +352,7 @@ router.get("/", async (req, res) => {
         // only send last few entries instead of all of them
         openNo: { $slice: 5 },
         closeNo: { $slice: 5 },
-        resultNo: { $slice:  5 },
+        resultNo: { $slice: 5 },
       }
     );
 
@@ -454,24 +534,28 @@ router.get("/latest-updates", async (req, res) => {
 });
 
 router.put("/deleteRecord/:id", async (req, res) => {
-  console.log( req.params);
-  
+  console.log(req.params);
+
   const { id } = req.params;
   console.log(id);
-  
+
   const { date, type } = req.body;
 
   if (!date || !type || !["Open", "Close"].includes(type)) {
-    return res.status(400).json({ success: false, message: "Invalid request. Provide date and type ('Open' or 'Close')." });
+    return res.status(400).json({
+      success: false,
+      message: "Invalid request. Provide date and type ('Open' or 'Close').",
+    });
   }
 
   try {
     // Find game
     const game = await AllGames.findById(id);
     if (!game) {
-      return res.status(404).json({ success: false, message: "Game not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Game not found" });
     }
-    
 
     // Helper to filter array-of-arrays: element[2] is ISO date string => compare YYYY-MM-DD
     const dateKey = (d) => (d && d.slice(0, 10)) || "";
@@ -481,23 +565,34 @@ router.put("/deleteRecord/:id", async (req, res) => {
 
     if (type === "Open") {
       beforeCount = (game.openNo || []).length;
-      game.openNo = (game.openNo || []).filter((entry) => dateKey(entry[2]) !== date);
+      game.openNo = (game.openNo || []).filter(
+        (entry) => dateKey(entry[2]) !== date
+      );
       afterCount = game.openNo.length;
     } else {
       beforeCount = (game.closeNo || []).length;
-      game.closeNo = (game.closeNo || []).filter((entry) => dateKey(entry[2]) !== date);
+      game.closeNo = (game.closeNo || []).filter(
+        (entry) => dateKey(entry[2]) !== date
+      );
       afterCount = game.closeNo.length;
     }
 
     const removed = beforeCount - afterCount;
     if (removed <= 0) {
-      return res.status(404).json({ success: false, message: "No matching record found to delete" });
+      return res.status(404).json({
+        success: false,
+        message: "No matching record found to delete",
+      });
     }
 
     // Save changes
     await game.save();
 
-    return res.json({ success: true, message: `Deleted ${removed} record(s)`, removed });
+    return res.json({
+      success: true,
+      message: `Deleted ${removed} record(s)`,
+      removed,
+    });
   } catch (err) {
     console.error("deleteRecord error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -598,54 +693,131 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// router.post("/api/getGameFormLink", async (req, res) => {
+//   console.log("body", req.body);
+//   const { url, userName, admin } = req.body;
+
+//   // console.log("called");
+//   try {
+//     const response = await fetch(url);
+//     // console.log(response);
+
+//     const gamesFromApi = await response.json();
+//     console.log(gamesFromApi.data);
+
+//     if (!Array.isArray(gamesFromApi.data)) {
+//       return res.status(400).json({ error: "Invalid API response format" });
+//     }
+
+//     const today = new Date();
+//     const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
+
+//     const results = [];
+
+//     for (const game of gamesFromApi.data) {
+//       const dbGame = await AllGames.findOne({ name: game.category_name });
+//       if (!dbGame) continue;
+//       // console.log(role);
+
+//       // ✅ Ownership check
+//       if (admin !== "Admin" && dbGame.owner !== userName) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - not owner",
+//         });
+//         continue;
+//       }
+
+//       // ✅ Build result
+//       const resultArray = [
+//         game.value1,
+//         game.value2,
+//         game.value3,
+//         today,
+//         "Open",
+//         dayName,
+//       ];
+
+//       // ✅ Save to DB
+//       await AllGames.findByIdAndUpdate(
+//         dbGame._id,
+//         {
+//           $push: { resultNo: resultArray, openNo: resultArray },
+//           $set: { updatedAt: new Date() },
+//         },
+//         { new: true, runValidators: true }
+//       );
+
+//       results.push({ game: game.category_name, status: "updated" });
+//     }
+
+//     res.status(200).json({ success: true, results });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Failed to fetch results" });
+//   }
+// });
+
+
 router.post("/api/getGameFormLink", async (req, res) => {
   const { url, userName, admin } = req.body;
-  // console.log("called");
+
   try {
     const response = await fetch(url);
-    // console.log(response);
-
     const gamesFromApi = await response.json();
-    // console.log(gamesFromApi.data);
 
     if (!Array.isArray(gamesFromApi.data)) {
       return res.status(400).json({ error: "Invalid API response format" });
     }
 
     const today = new Date();
+    const dateKey = today.toISOString().split("T")[0]; // "2025-12-22"
     const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
-
     const results = [];
 
     for (const game of gamesFromApi.data) {
       const dbGame = await AllGames.findOne({ name: game.category_name });
+      
       if (!dbGame) continue;
-      // console.log(role);
 
       // ✅ Ownership check
       if (admin !== "Admin" && dbGame.owner !== userName) {
-        results.push({
-          game: game.category_name,
-          status: "skipped - not owner",
-        });
+        results.push({ game: game.category_name, status: "skipped - not owner" });
         continue;
       }
 
-      // ✅ Build result
-      const resultArray = [
-        game.value1,
-        game.value2,
-        game.value3,
-        today,
-        "Open",
-        dayName,
-      ];
+      // ✅ Process Value2 (e.g., "17" becomes "1" and "7")
+      const openDigit = game.value2 ? game.value2.toString().charAt(0) : "";
+      const closeDigit = game.value2 ? game.value2.toString().charAt(1) : "";
+
+      // ✅ Create the New Data Arrays
+      const newOpenEntry = [game.value1, openDigit, today.toISOString(), "Open", dayName];
+      const newCloseEntry = [game.value3, closeDigit, today.toISOString(), "Close", dayName];
+
+      // ✅ Helper function to remove old entries for "Today"
+      const removeToday = (arr) => {
+        if (!Array.isArray(arr)) return [];
+        return arr.filter(entry => entry[2] && !entry[2].startsWith(dateKey));
+      };
+
+      // ✅ Update Arrays (Remove old today's entry, then add new one at the top)
+      const updatedOpenNo = removeToday(dbGame.openNo);
+      updatedOpenNo.unshift(newOpenEntry);
+
+      const updatedCloseNo = removeToday(dbGame.closeNo);
+      updatedCloseNo.unshift(newCloseEntry);
 
       // ✅ Save to DB
-      await AllGames.findByIdAndUpdate(dbGame._id, {
-        $push: { resultNo: resultArray, openNo: resultArray },
-        updatedAt: new Date(),
-      });
+      await AllGames.findByIdAndUpdate(
+        dbGame._id,
+        {
+          $set: { 
+            openNo: updatedOpenNo, 
+            closeNo: updatedCloseNo,
+            updatedAt: new Date() 
+          }
+        }
+      );
 
       results.push({ game: game.category_name, status: "updated" });
     }
@@ -653,7 +825,7 @@ router.post("/api/getGameFormLink", async (req, res) => {
     res.status(200).json({ success: true, results });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fetch results" });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -687,7 +859,7 @@ router.put("/updateFull/:id", async (req, res) => {
 
     // Update ONLY fields that came from frontend
     if (name) game.name = name;
-    if(noOfDays) game.noOfDays = noOfDays
+    if (noOfDays) game.noOfDays = noOfDays;
     if (owner) game.owner = owner;
     if (startTime) game.startTime = startTime;
     if (endTime) game.endTime = endTime;

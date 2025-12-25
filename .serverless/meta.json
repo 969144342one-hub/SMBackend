@@ -1,6 +1,6 @@
 {
   "D:\\AdminNIstant Project\\SMBackend\\SMBackendCode-main\\SMBackendCode-main\\serverless.yml": {
-    "versionFramework": "4.28.0",
+    "versionFramework": "4.29.0",
     "servicePath": "D:\\AdminNIstant Project\\SMBackend\\SMBackendCode-main\\SMBackendCode-main\\serverless.yml",
     "serviceConfigFileName": "serverless.yml",
     "service": {
