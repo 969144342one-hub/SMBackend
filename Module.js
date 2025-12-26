@@ -55,7 +55,6 @@ const endpointSchema = new mongoose.Schema({
   }
 });
 
-
 const liveResultSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
@@ -109,6 +108,11 @@ const PayMentBalanceRate = mongoose.model(
 // ⚠️ ADDED: Model for AgentListSchema
 const AgentList = mongoose.model("AgentList", AgentListSchema);
 
+const endPointSchemaUrl = mongoose.model("Endpoint", endpointSchema);
+
 
 // Export them (ESM way)
-export { User, AllGames, LiveResult, PayMentBalanceRate, Notification, AgentList };
+export { User, AllGames, LiveResult, PayMentBalanceRate, Notification, AgentList, endPointSchemaUrl };
+
+// Export them (ESM way)
+// export { User, AllGames, LiveResult, PayMentBalanceRate, Notification, AgentList };
