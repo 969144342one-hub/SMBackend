@@ -38,6 +38,24 @@ const allGamesSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const endpointSchema = new mongoose.Schema({
+  url: {
+    type: String,
+  },
+  ArrayOfGames:{
+    type:Array,
+  },
+  enabled: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+
 const liveResultSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
