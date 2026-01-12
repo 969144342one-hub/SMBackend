@@ -8,93 +8,270 @@ import dayjs from "dayjs";
 
 const router = express.Router();
 
+/* =========================================================
+   🔹 INTERNAL SHARED FUNCTION (NO API CALL ❌)
+   ========================================================= */
+   async function processGameFormInternal({ url, userName, admin }) {
+    console.log("⚙ Processing game form internally");
+  
+    const response = await fetch(url);
+    const gamesFromApi = await response.json();
+  
+    if (!Array.isArray(gamesFromApi.data)) {
+      throw new Error("Invalid API response format");
+    }
+  
+    const today = new Date();
+    const dateKey = today.toISOString().split("T")[0];
+    const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
+  
+    const results = [];
+  
+    for (const game of gamesFromApi.data) {
+      const dbGame = await AllGames.findOne({ name: game.category_name });
+      if (!dbGame) continue;
+  
+      if (admin !== "Admin" && dbGame.owner !== userName) {
+        results.push({ game: game.category_name, status: "skipped - not owner" });
+        continue;
+      }
+  
+      const openDigit = game.value2?.toString().charAt(0) || "";
+      const closeDigit = game.value2?.toString().charAt(1) || "";
+  
+      const newOpenEntry = [
+        game.value1,
+        openDigit,
+        today.toISOString(),
+        "Open",
+        dayName,
+      ];
+  
+      const newCloseEntry = [
+        game.value3,
+        closeDigit,
+        today.toISOString(),
+        "Close",
+        dayName,
+      ];
+  
+      const removeToday = (arr = []) =>
+        arr.filter((e) => e[2] && !e[2].startsWith(dateKey));
+  
+      await AllGames.findByIdAndUpdate(dbGame._id, {
+        $set: {
+          openNo: [newOpenEntry, ...removeToday(dbGame.openNo)],
+          closeNo: [newCloseEntry, ...removeToday(dbGame.closeNo)],
+          updatedAt: new Date(),
+        },
+      });
+  
+      results.push({ game: game.category_name, status: "updated" });
+    }
+  
+    return results;
+  }
+  
+
 // ---------------- UPDATE GAME DATA FROM FRONTEND JSON ----------------
-// router.post("/updateGamesData", async (req, res) => {
-//   console.log("hello I hitted", req);
 
+// router.post("/cron/check-game-windows", async (req, res) => {
 //   try {
-//     const records = req.body; // The frontend will send JSON array here
+//     console.log("⏱ Cron job triggered");
 
-//     if (!Array.isArray(records) || records.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message:
-//           "Invalid or empty data received. Expected an array of records.",
-//       });
+//     // 1. Fetch config
+//     const config = await Endpoint.findOne({ enabled: true });
+//     if (!config) {
+//       return res.json({ message: "System inactive" });
 //     }
 
-//     const getDayFromDate = (dateStr) => dayjs(dateStr).format("dddd");
+//     // 2. Fetch selected games
+//     const games = await AllGames.find({
+//       _id: { $in: config.ArrayOfGames }
+//     });
 
-//     let updatedGames = 0;
-//     let newGames = 0;
+//     const now = new Date();
+//     const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-//     for (const record of records) {
-//       const { category_name, date, open_pana, open_close, close_pana } = record;
+//     const parseTime = (timeStr) => {
+//       const [h, m] = timeStr.split(":").map(Number);
+//       return h * 60 + m;
+//     };
 
-//       if (!category_name || !open_pana || !close_pana || !open_close || !date)
-//         continue;
+//     for (const game of games) {
+//       const start = parseTime(game.startTime);
+//       const end = parseTime(game.endTime);
 
-//       const openDigit = open_close[0];
-//       const closeDigit = open_close[1];
-//       const day = getDayFromDate(date);
-//       const dateTime = new Date(date).toISOString();
+//       const inStartWindow =
+//         currentMinutes >= start - 5 && currentMinutes <= start + 10;
 
-//       // Prepare entries
-//       const openEntry = [open_pana, openDigit, dateTime, "Open", day];
-//       const closeEntry = [close_pana, closeDigit, dateTime, "Close", day];
+//       const inEndWindow =
+//         currentMinutes >= end - 5 && currentMinutes <= end + 10;
 
-//       console.log(category_name);
-
-//       // Find existing game
-//       let game = await AllGames.findOne({ name: category_name });
-//       console.log(game);
-
-//       if (!game) {
-//         game = new AllGames({
-//           name: category_name,
-//           owner: "System",
-//           resultNo: [],
-//           openNo: [],
-//           closeNo: [],
-//           startTime: "00:00",
-//           liveTime: 0,
-//           endTime: "01:00",
-//           Notification_Message: [],
-//           nameColor: "#000000",
-//           resultColor: "#000000",
-//           panelColor: "#66ff00",
-//           notificationColor: "#ff0000",
-//           status: "Active",
-//           fontSize: "18",
-//         });
-//         newGames++;
-//       } else {
-//         updatedGames++;
+//       if (inStartWindow) {
+//         console.log(`🚀 START API for ${game.name}`);
+//         // callExternalAPI(game, "START");
 //       }
 
-//       // Append new data
-//       game.openNo.push(openEntry);
-//       game.closeNo.push(closeEntry);
+//       if (inEndWindow) {
+//         console.log(`🛑 CLOSE API for ${game.name}`);
+//         // callExternalAPI(game, "CLOSE");
+//       }
+//     }
 
-//       await game.save();
-//       console.log(newGames,updatedGames, "games update and added successfully");
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Cron failed" });
+//   }
+// });
+
+// const callGameFormAPI = async ({ url, userName, admin }) => {
+//   try {
+//     console.log("📡 Calling Game Form API");
+
+//     const response = await fetch(
+//       "https://pn2rckc8ff.execute-api.ap-south-1.amazonaws.com/prod/AllGames/api/getGameFormLink",
+//       {
+//         method: "POST",
+//         headers: {
+//           "Content-Type": "application/json",
+//         },
+//         body: JSON.stringify({
+//           url,
+//           userName,
+//           admin,
+//         }),
+//       }
+//     );
+
+//     const data = await response.json();
+//     console.log("✅ Game Form API response:", data);
+
+//     return data;
+//   } catch (err) {
+//     console.error("❌ Error calling Game Form API:", err.message);
+//   }
+// };
+
+
+// router.post("/cron/check-game-windows", async (req, res) => {
+//   console.log("called at the starting");
+  
+//   try {
+//     console.log("⏱ Cron job triggered");
+
+//     // 1. Fetch config
+//     const config = await endPointSchemaUrl.findOne({ enabled: true });
+//     if (!config) {
+//       return res.json({ message: "System inactive" });
+//     }
+
+//     // 2. Fetch selected games
+//     const games = await AllGames.find({
+//       _id: { $in: config.ArrayOfGames }
+//     });
+
+//     const now = new Date();
+//     const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+//     const parseTime = (timeStr) => {
+//       const [h, m] = timeStr.split(":").map(Number);
+//       return h * 60 + m;
+//     };
+
+//     for (const game of games) {
+//       const start = parseTime(game.startTime);
+//       const end = parseTime(game.endTime);
+//       console.log("called Done done", start, end, currentMinutes, game.name);
+      
+//       const inStartWindow =
+//         currentMinutes >= start - 5 && currentMinutes <= start + 10;
+
+//       const inEndWindow =
+//         currentMinutes >= end - 5 && currentMinutes <= end + 10;
+//       console.log(inStartWindow, inEndWindow);
+      
+//       if (inStartWindow) {
+//         console.log(`🚀 START API for ${game.name}`);
+//         console.log("calling end point");
+//         await callGameFormAPI({
+//           url: config.url,
+//           userName: "System",
+//           admin: "Admin",
+//         });     
+//         console.log("calling point done");
+//       }
+
+//       if (inEndWindow) {
+//         console.log(`🛑 CLOSE API for ${game.name}`);
+//         console.log("calling end point");
+        
+//         await callGameFormAPI({
+//           url: config.url,
+//           userName: "System",
+//           admin: "Admin",
+//         });
+//         console.log("calling point");
+//       }
 
 //     }
 
-//     res.json({
-//       success: true,
-//       message: "✅ Game data updated successfully from frontend JSON",
-//       stats: { updatedGames, newGames },
-//     });
+//     res.json({ success: true });
 //   } catch (err) {
-//     console.error("❌ Error updating games:", err);
-//     res.status(500).json({
-//       success: false,
-//       message: "Failed to update games",
-//       error: err.message,
-//     });
+//     console.error(err);
+//     res.status(500).json({ error: "Cron failed" });
 //   }
 // });
+
+// router.post("/cron/check-game-windows", async (req, res) => {
+//   console.log("⏱ Cron job triggered");
+
+//   try {
+//     const config = await endPointSchemaUrl.findOne({ enabled: true });
+//     if (!config) {
+//       return res.json({ message: "System inactive" });
+//     }
+
+//     const games = await AllGames.find({
+//       _id: { $in: config.ArrayOfGames },
+//     });
+
+//     const now = new Date();
+//     const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+//     const parseTime = (t) => {
+//       const [h, m] = t.split(":").map(Number);
+//       return h * 60 + m;
+//     };
+
+//     for (const game of games) {
+//       const start = parseTime(game.startTime);
+//       const end = parseTime(game.endTime);
+
+//       const inStart =
+//         currentMinutes >= start - 5 && currentMinutes <= start + 10;
+//       const inEnd =
+//         currentMinutes >= end - 5 && currentMinutes <= end + 10;
+
+//       if (inStart || inEnd) {
+//         console.log(`🚀 Processing ${game.name}`);
+//         await processGameFormInternal({
+//           url: config.url,
+//           userName: "System",
+//           admin: "Admin",
+//         });
+//       }
+//     }
+
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error("Cron error:", err);
+//     res.status(500).json({ error: "Cron failed" });
+//   }
+// });
+
+
 
 router.post("/updateGamesData", async (req, res) => {
   try {
@@ -213,35 +390,6 @@ router.post("/updateGamesData", async (req, res) => {
     });
   }
 });
-
-// router.post("/endpoints", async (req, res) => {
-//   try {
-//     const { url, ArrayOfGames, Active } = req.body;
-
-//     // Validate
-//     if (!url || !ArrayOfGames || ArrayOfGames.length === 0) {
-//       return res
-//         .status(400)
-//         .json({ message: "URL and games are required" });
-//     }
-
-//     // Update existing record by URL, or insert if not found
-//     const updatedDoc = await endPointSchemaUrl.findOneAndUpdate(
-//       { url }, // filter: find by URL
-//       { ArrayOfGames, Active }, // fields to update
-//       { new: true, upsert: true } // return updated doc, create if not exists
-//     );
-
-//     res.status(200).json({
-//       success: true,
-//       data: updatedDoc,
-//       message: "Url and Games updated successfully",
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     return res.status(500).json({ message: "Server error" });
-//   }
-// });
 
 router.post("/endpoints", async (req, res) => {
   try {
@@ -453,6 +601,104 @@ router.put("/updateNotification/:id", async (req, res) => {
 });
 
 // ---------------- LATEST UPDATES ----------------
+// router.get("/latest-updates", async (req, res) => {
+//   console.log("lastest called");
+  
+//   try {
+//     const now = new Date();
+//     console.log("lastest called 1");
+    
+//     // Convert current UTC time to IST
+//     let hours = now.getUTCHours() + 5;
+//     let minutes = now.getUTCMinutes() + 30;
+//     console.log("lastest called 2");
+    
+//     // Handle overflow
+//     if (minutes >= 60) {
+//       minutes -= 60;
+//       hours += 1;
+//     }
+//     if (hours >= 24) {
+//       hours -= 24;
+//     }
+    
+//     const nowInMinutes = hours * 60 + minutes;
+//     console.log("lastest called 3");
+    
+//     const allGames = await AllGames.find({});
+//     console.log(allGames);
+//     console.log("lastest called 4");
+    
+//     const records = allGames.filter((game) => {
+//       console.log("lastest called 5");
+//       if (!game.startTime) return false;
+      
+//       // Determine the window in minutes
+//       const windowMinutes = 15;
+//       const windowEndInMinutes = nowInMinutes + windowMinutes;
+//       console.log("lastest called 6");
+      
+//       const [startH, startM] = game.startTime.split(":").map(Number);
+//       console.log("lastest called 7");
+//       const startInMinutes = startH * 60 + startM;
+//       const liveTiem = game.liveTime ? game.liveTime : 10;
+//       console.log("lastest called 8");
+      
+//       // Show games whose startTime is within the calculated window
+//       return (
+//         startInMinutes + liveTiem >= nowInMinutes &&
+//         startInMinutes <= windowEndInMinutes
+//       );
+//     });
+    
+//     const end_records = allGames.filter((game) => {
+//       console.log("lastest called 9");
+//       if (!game.endTime) return false;
+      
+//       // Determine the window in minutes
+//       const windowMinutes = 15;
+//       const windowEndInMinutes = nowInMinutes + windowMinutes;
+      
+//       const [startH, startM] = game.endTime.split(":").map(Number);
+//       const startInMinutes = startH * 60 + startM;
+//       const liveTiem = game.liveTime ? game.liveTime : 10;
+//       console.log("lastest called 10");
+      
+//       // Show games whose startTime is within the calculated window
+//       return (
+//         startInMinutes + liveTiem >= nowInMinutes &&
+//         startInMinutes <= windowEndInMinutes
+//       );
+//     });
+//     console.log("lastest called 11");
+    
+//     const combinedData = records.concat(end_records);
+//     console.log("lastest called 12");
+    
+//     // Sort by startTime ascending (soonest first)
+//     const sortedRecords = combinedData.sort((a, b) => {
+//       const [aH, aM] = a.startTime.split(":").map(Number);
+//       const [bH, bM] = b.startTime.split(":").map(Number);
+//       return aH * 60 + aM - (bH * 60 + bM);
+//     });
+//     console.log("lastest called 13");
+    
+//     const isDataPresent = sortedRecords.length > 0;
+//     console.log("lastest called 14");
+
+//     // ✅ Always send "data" as an array
+//     res.status(200).json({
+//       message: isDataPresent ? "There is data" : "Data is not present",
+//       hasData: isDataPresent,
+//       data: sortedRecords, // will be [] if no records
+//     });
+//   } catch (error) {
+//     console.log("Error fetching records:", error)
+//     // console.error("Error fetching records:", error);
+//     res.status(500).json({ error: "Failed to fetch records", err:error });
+//   }
+// });
+
 router.get("/latest-updates", async (req, res) => {
   try {
     const now = new Date();
@@ -532,6 +778,87 @@ router.get("/latest-updates", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch records" });
   }
 });
+
+
+// router.get("/latest-updates", async (req, res) => {
+//   try {
+//     const now = new Date();
+
+//     // Convert current UTC time to IST
+//     let hours = now.getUTCHours() + 5;
+//     let minutes = now.getUTCMinutes() + 30;
+
+//     // Handle overflow
+//     if (minutes >= 60) {
+//       minutes -= 60;
+//       hours += 1;
+//     }
+//     if (hours >= 24) {
+//       hours -= 24;
+//     }
+
+//     const nowInMinutes = hours * 60 + minutes;
+
+//     const allGames = await AllGames.find({});
+
+//     const records = allGames.filter((game) => {
+//       if (!game.startTime) return false;
+
+//       // Determine the window in minutes
+//       const windowMinutes = 15;
+//       const windowEndInMinutes = nowInMinutes + windowMinutes;
+
+//       const [startH, startM] = game.startTime.split(":").map(Number);
+//       const startInMinutes = startH * 60 + startM;
+//       const liveTiem = game.liveTime ? game.liveTime : 10;
+
+//       // Show games whose startTime is within the calculated window
+//       return (
+//         startInMinutes + liveTiem >= nowInMinutes &&
+//         startInMinutes <= windowEndInMinutes
+//       );
+//     });
+
+//     const end_records = allGames.filter((game) => {
+//       if (!game.endTime) return false;
+
+//       // Determine the window in minutes
+//       const windowMinutes = 15;
+//       const windowEndInMinutes = nowInMinutes + windowMinutes;
+
+//       const [startH, startM] = game.endTime.split(":").map(Number);
+//       const startInMinutes = startH * 60 + startM;
+//       const liveTiem = game.liveTime ? game.liveTime : 10;
+
+//       // Show games whose startTime is within the calculated window
+//       return (
+//         startInMinutes + liveTiem >= nowInMinutes &&
+//         startInMinutes <= windowEndInMinutes
+//       );
+//     });
+
+//     const combinedData = records.concat(end_records);
+
+//     // Sort by startTime ascending (soonest first)
+//     const sortedRecords = combinedData.sort((a, b) => {
+//       const [aH, aM] = a.startTime.split(":").map(Number);
+//       const [bH, bM] = b.startTime.split(":").map(Number);
+//       return aH * 60 + aM - (bH * 60 + bM);
+//     });
+
+//     const isDataPresent = sortedRecords.length > 0;
+
+//     // ✅ Always send "data" as an array
+//     res.status(200).json({
+//       message: isDataPresent ? "There is data" : "Data is not present",
+//       hasData: isDataPresent,
+//       data: sortedRecords, // will be [] if no records
+//     });
+//   } catch (error) {
+//     console.error("Error fetching records:", error);
+//     res.status(500).json({ error: "Failed to fetch records" });
+//   }
+// });
 
 router.put("/deleteRecord/:id", async (req, res) => {
   console.log(req.params);
@@ -693,72 +1020,6 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// router.post("/api/getGameFormLink", async (req, res) => {
-//   console.log("body", req.body);
-//   const { url, userName, admin } = req.body;
-
-//   // console.log("called");
-//   try {
-//     const response = await fetch(url);
-//     // console.log(response);
-
-//     const gamesFromApi = await response.json();
-//     console.log(gamesFromApi.data);
-
-//     if (!Array.isArray(gamesFromApi.data)) {
-//       return res.status(400).json({ error: "Invalid API response format" });
-//     }
-
-//     const today = new Date();
-//     const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
-
-//     const results = [];
-
-//     for (const game of gamesFromApi.data) {
-//       const dbGame = await AllGames.findOne({ name: game.category_name });
-//       if (!dbGame) continue;
-//       // console.log(role);
-
-//       // ✅ Ownership check
-//       if (admin !== "Admin" && dbGame.owner !== userName) {
-//         results.push({
-//           game: game.category_name,
-//           status: "skipped - not owner",
-//         });
-//         continue;
-//       }
-
-//       // ✅ Build result
-//       const resultArray = [
-//         game.value1,
-//         game.value2,
-//         game.value3,
-//         today,
-//         "Open",
-//         dayName,
-//       ];
-
-//       // ✅ Save to DB
-//       await AllGames.findByIdAndUpdate(
-//         dbGame._id,
-//         {
-//           $push: { resultNo: resultArray, openNo: resultArray },
-//           $set: { updatedAt: new Date() },
-//         },
-//         { new: true, runValidators: true }
-//       );
-
-//       results.push({ game: game.category_name, status: "updated" });
-//     }
-
-//     res.status(200).json({ success: true, results });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ error: "Failed to fetch results" });
-//   }
-// });
-
-
 router.post("/api/getGameFormLink", async (req, res) => {
   const { url, userName, admin } = req.body;
 
@@ -777,7 +1038,7 @@ router.post("/api/getGameFormLink", async (req, res) => {
 
     for (const game of gamesFromApi.data) {
       const dbGame = await AllGames.findOne({ name: game.category_name });
-      
+
       if (!dbGame) continue;
 
       // ✅ Ownership check
@@ -811,10 +1072,10 @@ router.post("/api/getGameFormLink", async (req, res) => {
       await AllGames.findByIdAndUpdate(
         dbGame._id,
         {
-          $set: { 
-            openNo: updatedOpenNo, 
+          $set: {
+            openNo: updatedOpenNo,
             closeNo: updatedCloseNo,
-            updatedAt: new Date() 
+            updatedAt: new Date()
           }
         }
       );
