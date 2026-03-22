@@ -33,7 +33,8 @@ const allGamesSchema = new mongoose.Schema(
     valid_date: {type: Date}, // Corrected 'require' to 'required'
     amount :{type: String}, // Corrected 'require' to 'required'
     method: {type: String}, // Corrected 'require' to 'required'
-    status:{type: String} // Corrected 'require' to 'required'
+    status:{type: String}, // Corrected 'require' to 'required'
+    IsNotification:{type:String}
   },
   { timestamps: true }
 );
