@@ -501,6 +501,81 @@ router.get("/", async (req, res) => {
         openNo: { $slice: 5 },
         closeNo: { $slice: 5 },
         resultNo: { $slice: 5 },
+        IsNotification: 1,
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Fetched all game data successfully",
+      data: games,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch game data",
+      error: error.message,
+    });
+  }
+}); 
+
+router.get("/FilterJodiChart", async (req, res) => {
+  try {
+    // Only fetch metadata + last 5 results for fast load
+    const games = await AllGames.find(
+      {},
+      {
+        name: 1,
+        owner: 1,
+        startTime: 1,
+        endTime: 1,
+        status: 1,
+        liveTime: 1,
+        nameColor: 1,
+        resultColor: 1,
+        panelColor: 1,
+        notificationColor: 1,
+        fontSize: 1,
+        IsNotification: 1,
+      }
+    );
+
+    const FilteringBasedOnActive = (game) => game.status === 'Active' && game.IsNotification !== "Yes";
+    const filteredGames = games.filter(FilteringBasedOnActive);
+
+    res.status(200).json({
+      success: true,
+      message: "Fetched all game data successfully",
+      data: filteredGames,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch game data",
+      error: error.message,
+    });
+  }
+});
+
+
+router.get("/detils", async (req, res) => {
+  try {
+    // Only fetch metadata + last 5 results for fast load
+    const games = await AllGames.find(
+      {},
+      {
+        name: 1,
+        owner: 1,
+        startTime: 1,
+        endTime: 1,
+        status: 1,
+        liveTime: 1,
+        nameColor: 1,
+        resultColor: 1,
+        panelColor: 1,
+        notificationColor: 1,
+        fontSize: 1,
+        IsNotification: 1,
       }
     );
 
@@ -517,6 +592,7 @@ router.get("/", async (req, res) => {
     });
   }
 });
+
 
 // ---------------- LATEST UPDATES ----------------
 // ---------------- SET LIVE TIME ----------------
@@ -699,87 +775,6 @@ router.put("/updateNotification/:id", async (req, res) => {
 //   }
 // });
 
-router.get("/latest-updates", async (req, res) => {
-  try {
-    const now = new Date();
-
-    // Convert current UTC time to IST
-    let hours = now.getUTCHours() + 5;
-    let minutes = now.getUTCMinutes() + 30;
-
-    // Handle overflow
-    if (minutes >= 60) {
-      minutes -= 60;
-      hours += 1;
-    }
-    if (hours >= 24) {
-      hours -= 24;
-    }
-
-    const nowInMinutes = hours * 60 + minutes;
-
-    const allGames = await AllGames.find({});
-
-    const records = allGames.filter((game) => {
-      if (!game.startTime) return false;
-
-      // Determine the window in minutes
-      const windowMinutes = 15;
-      const windowEndInMinutes = nowInMinutes + windowMinutes;
-
-      const [startH, startM] = game.startTime.split(":").map(Number);
-      const startInMinutes = startH * 60 + startM;
-      const liveTiem = game.liveTime ? game.liveTime : 10;
-
-      // Show games whose startTime is within the calculated window
-      return (
-        startInMinutes + liveTiem >= nowInMinutes &&
-        startInMinutes <= windowEndInMinutes
-      );
-    });
-
-    const end_records = allGames.filter((game) => {
-      if (!game.endTime) return false;
-
-      // Determine the window in minutes
-      const windowMinutes = 15;
-      const windowEndInMinutes = nowInMinutes + windowMinutes;
-
-      const [startH, startM] = game.endTime.split(":").map(Number);
-      const startInMinutes = startH * 60 + startM;
-      const liveTiem = game.liveTime ? game.liveTime : 10;
-
-      // Show games whose startTime is within the calculated window
-      return (
-        startInMinutes + liveTiem >= nowInMinutes &&
-        startInMinutes <= windowEndInMinutes
-      );
-    });
-
-    const combinedData = records.concat(end_records);
-
-    // Sort by startTime ascending (soonest first)
-    const sortedRecords = combinedData.sort((a, b) => {
-      const [aH, aM] = a.startTime.split(":").map(Number);
-      const [bH, bM] = b.startTime.split(":").map(Number);
-      return aH * 60 + aM - (bH * 60 + bM);
-    });
-
-    const isDataPresent = sortedRecords.length > 0;
-
-    // ✅ Always send "data" as an array
-    res.status(200).json({
-      message: isDataPresent ? "There is data" : "Data is not present",
-      hasData: isDataPresent,
-      data: sortedRecords, // will be [] if no records
-    });
-  } catch (error) {
-    console.error("Error fetching records:", error);
-    res.status(500).json({ error: "Failed to fetch records" });
-  }
-});
-
-
 // router.get("/latest-updates", async (req, res) => {
 //   try {
 //     const now = new Date();
@@ -859,6 +854,128 @@ router.get("/latest-updates", async (req, res) => {
 //     res.status(500).json({ error: "Failed to fetch records" });
 //   }
 // });
+
+
+router.get("/latest-updates", async (req, res) => {
+  console.log("got Hit bro");
+  
+  try {
+    const now = new Date();
+    let hours = now.getUTCHours() + 5;
+    let minutes = now.getUTCMinutes() + 30;
+
+    if (minutes >= 60) {
+      minutes -= 60;
+      hours += 1;
+    }
+    if (hours >= 24) {
+      hours -= 24;
+    }
+
+    const nowInMinutes = hours * 60 + minutes;
+    const windowMinutes = 15;
+    const windowEndInMinutes = nowInMinutes + windowMinutes;
+
+    // ✅ Use aggregation to slice arrays at database level
+    const allGames = await AllGames.aggregate([
+      {
+        $match: {
+          $or: [
+            { startTime: { $exists: true, $ne: null } },
+            { endTime: { $exists: true, $ne: null } }
+          ]
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          owner: 1,
+          startTime: 1,
+          endTime: 1,
+          liveTime: 1,
+          fontSize: 1,
+          nameColor: 1,
+          resultColor: 1,
+          panelColor: 1,
+          notificationColor: 1,
+          valid_date: 1,
+          amount: 1,
+          method: 1,
+          status: 1,
+          noOfDays: 1,
+          // ✅ Only get first element of arrays
+          resultNo: { $slice: ["$resultNo", 1] },      // First element only
+          openNo: { $slice: ["$openNo", 1] },          // First element only
+          closeNo: { $slice: ["$closeNo", 1] },        // First element only
+          Notification_Message: { $slice: ["$Notification_Message", 1] }, // First element only
+          IsNotification:1,
+        }
+      },
+      {
+        $limit: 10000 // Safety limit
+      }
+    ]).allowDiskUse(true);
+
+    const records = [];
+    const end_records = [];
+
+    for (const game of allGames) {
+      if(game.IsNotification === "Yes") {
+        console.log("Passed the game");
+        
+        continue
+      }
+      if (game.startTime) {
+        const [startH, startM] = game.startTime.split(":").map(Number);
+        const startInMinutes = startH * 60 + startM;
+        const liveTime = game.liveTime || 10;
+
+        if (
+          startInMinutes + liveTime >= nowInMinutes &&
+          startInMinutes <= windowEndInMinutes
+        ) {
+          records.push(game);
+        }
+      }
+
+      if (game.endTime) {
+        const [endH, endM] = game.endTime.split(":").map(Number);
+        const endInMinutes = endH * 60 + endM;
+        const liveTime = game.liveTime || 10;
+
+        if (
+          endInMinutes + liveTime >= nowInMinutes &&
+          endInMinutes <= windowEndInMinutes
+        ) {
+          end_records.push(game);
+        }
+      }
+    }
+
+    const combinedData = [...records, ...end_records];
+    
+    // Remove duplicates
+    const uniqueData = Array.from(
+      new Map(combinedData.map(item => [item._id.toString(), item])).values()
+    );
+
+    const sortedRecords = uniqueData.sort((a, b) => {
+      const [aH, aM] = (a.startTime || "00:00").split(":").map(Number);
+      const [bH, bM] = (b.startTime || "00:00").split(":").map(Number);
+      return aH * 60 + aM - (bH * 60 + bM);
+    });
+
+    res.status(200).json({
+      message: sortedRecords.length > 0 ? "There is data" : "Data is not present",
+      hasData: sortedRecords.length > 0,
+      data: sortedRecords,
+    });
+  } catch (error) {
+    console.error("Error fetching records:", error);
+    res.status(500).json({ error: "Failed to fetch records" });
+  }
+});
 
 router.put("/deleteRecord/:id", async (req, res) => {
   console.log(req.params);
@@ -1006,89 +1123,1331 @@ router.put("/deleteRecord/:id", async (req, res) => {
 // });
 
 // ---------------- GET BY ID ----------------
-router.get("/:id", async (req, res) => {
-  try {
-    const game = await AllGames.findById(req.params.id);
-    if (!game) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Game not found" });
-    }
-    res.json({ success: true, data: game });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
+
+
+// router.post("/api/getGameFormLink", async (req, res) => {
+//   try {
+//     const isScheduledEvent = req.body["detail-type"] === "Scheduled Event";
+
+//     let url, userName, admin;
+//     console.log("Trigered");
+    
+//     // 🔹 Scheduler trigger
+//     if (isScheduledEvent) {
+//       const config = await endPointSchemaUrl.findOne({ enabled: true });
+//       if (!config || !config.url) {
+//         return res.status(200).json({ message: "Form link not active" });
+//       }
+//       url = config.url;
+//       admin = "Admin";
+//       userName = null;
+//     }
+//     // 🔹 Manual trigger
+//     else {
+//       ({ url, userName, admin } = req.body);
+//       if (!url) {
+//         return res.status(400).json({ error: "URL is required" });
+//       }
+//     }
+
+//     // 🔹 External API call with timeout
+//     const controller = new AbortController();
+//     const timeout = setTimeout(() => controller.abort(), 5000);
+
+//     let apiResponse;
+//     try {
+//       const response = await fetch(url, { signal: controller.signal });
+//       apiResponse = await response.json();
+//     } catch (err) {
+//       return res.status(504).json({ error: "External API timeout" });
+//     } finally {
+//       clearTimeout(timeout);
+//     }
+
+//     if (!Array.isArray(apiResponse?.data)) {
+//       return res.status(400).json({ error: "Invalid API response format" });
+//     }
+
+//     // =========================================================
+//     // 🔧 TIME HELPERS (FINAL FIX)
+//     // =========================================================
+
+//     // Normalize "HH:mm" or "HH:mm:ss" → minutes
+//     const timeToMinutes = (timeStr) => {
+//       if (!timeStr || typeof timeStr !== "string") return null;
+//       const clean = timeStr.trim().substring(0, 5); // "HH:mm"
+//       const [hh, mm] = clean.split(":").map(Number);
+//       if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+//       return hh * 60 + mm;
+//     };
+
+//     // UTC → IST (+5:30)
+//     const getISTMinutes = () => {
+//       const nowUTC = new Date();
+//       const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+//       const ist = new Date(nowUTC.getTime() + IST_OFFSET_MS);
+
+//       return {
+//         minutes: ist.getHours() * 60 + ist.getMinutes(),
+//         istISO: ist.toISOString(),
+//       };
+//     };
+
+//     const { minutes: nowMinutes, istISO } = getISTMinutes();
+
+//     const todayUTC = new Date();
+//     const dateKey = todayUTC.toISOString().split("T")[0];
+//     const dayName = todayUTC.toLocaleDateString("en-US", { weekday: "long" });
+
+//     const PLACEHOLDER_FIRST = "***";
+//     const PLACEHOLDER_SECOND = "*";
+
+//     const results = [];
+
+//     // =========================================================
+//     // 🔹 MAIN PROCESSING
+//     // =========================================================
+//     await Promise.all(
+//       apiResponse.data.map(async (game) => {
+//         if (!game?.category_name) return;
+
+//         // 🔍 Find game
+//         let dbGame = await AllGames.findOne({ name: game.category_name });
+
+//         // 🆕 Auto-create game if not exists
+//         if (!dbGame) {
+//           if (!game.open_time || !game.close_time) {
+//             results.push({
+//               game: game.category_name,
+//               status: "skipped - missing time",
+//             });
+//             return;
+//           }
+
+//           dbGame = await AllGames.create({
+//             name: game.category_name,
+//             owner: admin === "Admin" ? "Admin" : userName,
+//             startTime: game.open_time, // stored as string
+//             endTime: game.close_time,
+//             openNo: [],
+//             closeNo: [],
+//             createdAt: new Date(),
+//             updatedAt: new Date(),
+//           });
+
+//           results.push({
+//             game: game.category_name,
+//             status: "created",
+//           });
+//         }
+
+//         // 🔐 Ownership check
+//         if (admin !== "Admin" && dbGame.owner !== userName) {
+//           results.push({
+//             game: game.category_name,
+//             status: "skipped - not owner",
+//           });
+//           return;
+//         }
+
+//         // ⏰ TIME COMPARISON (IST + MIDNIGHT SAFE)
+//         const openMinutes = timeToMinutes(dbGame.startTime);
+//         const closeMinutes = timeToMinutes(dbGame.endTime);
+
+//         if (openMinutes === null || closeMinutes === null) {
+//           results.push({
+//             game: game.category_name,
+//             status: "invalid time format",
+//           });
+//           return;
+//         }
+
+//         let isOpenPassed = false;
+//         let isClosePassed = false;
+
+//         // 🌙 Game crosses midnight
+//         if (closeMinutes < openMinutes) {
+//           isOpenPassed =
+//             nowMinutes >= openMinutes || nowMinutes < closeMinutes;
+//           isClosePassed = nowMinutes < closeMinutes;
+//         }
+//         // ☀️ Normal same-day game
+//         else {
+//           isOpenPassed = nowMinutes >= openMinutes;
+//           isClosePassed = nowMinutes >= closeMinutes;
+//         }
+
+//         const removeToday = (arr = []) =>
+//           arr.filter((e) => e[2] && !e[2].startsWith(dateKey));
+
+//         // 🔹 OPEN entry
+//         const openEntry = [
+//           isOpenPassed ? game.value1 : PLACEHOLDER_FIRST,
+//           isOpenPassed
+//             ? game.value2?.toString()?.[0] || PLACEHOLDER_SECOND
+//             : PLACEHOLDER_SECOND,
+//           istISO,
+//           "Open",
+//           dayName,
+//         ];
+
+//         // 🔹 CLOSE entry
+//         const closeEntry = [
+//           isClosePassed ? game.value3 : PLACEHOLDER_FIRST,
+//           isClosePassed
+//             ? game.value2?.toString()?.[1] || PLACEHOLDER_SECOND
+//             : PLACEHOLDER_SECOND,
+//           istISO,
+//           "Close",
+//           dayName,
+//         ];
+
+//         await AllGames.findByIdAndUpdate(dbGame._id, {
+//           $set: {
+//             openNo: [openEntry, ...removeToday(dbGame.openNo)],
+//             closeNo: [closeEntry, ...removeToday(dbGame.closeNo)],
+//             updatedAt: new Date(),
+//           },
+//         });
+
+//         results.push({
+//           game: game.category_name,
+//           status: isClosePassed
+//             ? "open & close updated"
+//             : isOpenPassed
+//             ? "open updated"
+//             : "placeholder only",
+//         });
+//       })
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       triggeredBy: isScheduledEvent ? "scheduler" : "manual",
+//       istTimeUsed: istISO,
+//       results,
+//     });
+//   } catch (err) {
+//     console.error("❌ API Error:", err);
+//     return res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
+// router.post("/api/getGameFormLink", async (req, res) => {
+//   try {
+//     console.log("🚀 Triggered");
+
+//     const isScheduledEvent =
+//       req.body?.["detail-type"] === "Scheduled Event";
+
+//     let url;
+
+//     // ==============================
+//     // 🔹 GET API URL
+//     // ==============================
+//     if (isScheduledEvent) {
+//       const config = await endPointSchemaUrl.findOne({ enabled: true });
+//       url =
+//         config?.url ||
+//         "https://sattamatkadpboss.live/site/liveresults";
+//     } else {
+//       url = req.body?.url;
+//       if (!url) {
+//         return res.status(400).json({ error: "URL is required" });
+//       }
+//     }
+
+//     // ==============================
+//     // 🔹 FETCH EXTERNAL API (TIMEOUT SAFE)
+//     // ==============================
+//     const controller = new AbortController();
+//     const timeout = setTimeout(() => controller.abort(), 5000);
+
+//     let apiResponse;
+//     try {
+//       const response = await fetch(url, { signal: controller.signal });
+//       apiResponse = await response.json();
+//     } catch (err) {
+//       return res.status(504).json({ error: "External API timeout" });
+//     } finally {
+//       clearTimeout(timeout);
+//     }
+
+//     if (!Array.isArray(apiResponse?.data)) {
+//       return res.status(400).json({ error: "Invalid API response format" });
+//     }
+
+//     // ==============================
+//     // 🔹 TIME HELPERS
+//     // ==============================
+//     const timeToMinutes = (timeStr) => {
+//       if (!timeStr) return null;
+//       const [hh, mm] = timeStr.substring(0, 5).split(":").map(Number);
+//       if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+//       return hh * 60 + mm;
+//     };
+
+//     const getISTInfo = () => {
+//       const nowUTC = new Date();
+//       const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+//       const ist = new Date(nowUTC.getTime() + IST_OFFSET);
+
+//       return {
+//         nowMinutes: ist.getHours() * 60 + ist.getMinutes(),
+//         istISO: ist.toISOString(),
+//         dayName: ist.toLocaleDateString("en-IN", { weekday: "long" }),
+//       };
+//     };
+
+//     const { nowMinutes, istISO, dayName } = getISTInfo();
+
+//     // ==============================
+//     // 🔹 PROCESS EACH GAME (FAST)
+//     // ==============================
+//     const results = [];
+
+//     for (const game of apiResponse.data) {
+//       if (!game?.category_name) continue;
+
+//       // 🔹 Get ONLY required fields (NO big arrays)
+//       const dbGame = await AllGames.findOne(
+//         { name: game.category_name.trim() },
+//         { startTime: 1, endTime: 1 }
+//       ).lean();
+//       console.log(dbGame);
+      
+//       if (!dbGame) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - game not found",
+//         });
+//         continue;
+//       }
+
+//       const openMinutes = timeToMinutes(dbGame.startTime);
+//       const closeMinutes = timeToMinutes(dbGame.endTime);
+
+//       if (openMinutes === null || closeMinutes === null) continue;
+
+//       let openPassed = false;
+//       let closePassed = false;
+
+//       // 🌙 Midnight-safe logic
+//       if (closeMinutes < openMinutes) {
+//         openPassed = nowMinutes >= openMinutes || nowMinutes < closeMinutes;
+//         closePassed = nowMinutes < closeMinutes;
+//       } else {
+//         openPassed = nowMinutes >= openMinutes;
+//         closePassed = nowMinutes >= closeMinutes;
+//       }
+
+//       const updateQuery = {};
+//       const setQuery = { updatedAt: new Date() };
+
+//       // ==============================
+//       // ✅ OPEN UPDATE (NO ARRAY READ)
+//       // ==============================
+//       if (openPassed && game.value1 && game.value2) {
+//         updateQuery.$push = {
+//           ...(updateQuery.$push || {}),
+//           openNo: {
+//             $each: [
+//               [
+//                 game.value1,
+//                 game.value2.toString()[0],
+//                 istISO,
+//                 "Open",
+//                 dayName,
+//                 "Trigger",
+//               ],
+//             ],
+//             $position: 0,
+//           },
+//         };
+//       }
+
+//       // ==============================
+//       // ✅ CLOSE UPDATE (NO ARRAY READ)
+//       // ==============================
+//       if (closePassed && game.value3 && game.value2) {
+//         updateQuery.$push = {
+//           ...(updateQuery.$push || {}),
+//           closeNo: {
+//             $each: [
+//               [
+//                 game.value3,
+//                 game.value2.toString()[1],
+//                 istISO,
+//                 "Close",
+//                 dayName,
+//                 "Trigger"
+//               ],
+//             ],
+//             $position: 0,
+//             $slice: 500, // 🔥 KEEP ARRAY SMALL
+//           },
+//         };
+//       }
+
+//       if (!updateQuery.$push) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - time not passed",
+//         });
+//         continue;
+//       }
+
+//       // ==============================
+//       // 🔹 ATOMIC UPDATE
+//       // ==============================
+//       await AllGames.updateOne(
+//         { _id: dbGame._id },
+//         {
+//           ...updateQuery,
+//           $set: setQuery,
+//         }
+//       );
+
+//       results.push({
+//         game: game.category_name,
+//         status: "updated",
+//       });
+//     }
+
+//     // ==============================
+//     // 🔹 RESPONSE
+//     // ==============================
+//     return res.status(200).json({
+//       success: true,
+//       triggeredBy: isScheduledEvent ? "scheduler" : "manual",
+//       results,
+//     });
+//   } catch (err) {
+//     console.error("❌ API Error:", err);
+//     return res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
+// router.post("/api/getGameFormLink", async (req, res) => {
+//   try {
+//     console.log("🚀 Triggered");
+
+//     const isScheduledEvent =
+//       req.body?.["detail-type"] === "Scheduled Event";
+
+//     let url;
+
+//     // ==============================
+//     // 🔹 GET API URL
+//     // ==============================
+//     if (isScheduledEvent) {
+//       const config = await endPointSchemaUrl.findOne({ enabled: true });
+//       url =
+//         config?.url ||
+//         "https://sattamatkadpboss.live/site/liveresults";
+//     } else {
+//       url = req.body?.url;
+//       if (!url) {
+//         return res.status(400).json({ error: "URL is required" });
+//       }
+//     }
+
+//     // ==============================
+//     // 🔹 FETCH EXTERNAL API (TIMEOUT SAFE)
+//     // ==============================
+//     const controller = new AbortController();
+//     const timeout = setTimeout(() => controller.abort(), 5000);
+
+//     let apiResponse;
+//     try {
+//       const response = await fetch(url, { signal: controller.signal });
+//       apiResponse = await response.json();
+//     } catch (err) {
+//       return res.status(504).json({ error: "External API timeout" });
+//     } finally {
+//       clearTimeout(timeout);
+//     }
+
+//     if (!Array.isArray(apiResponse?.data)) {
+//       return res.status(400).json({ error: "Invalid API response format" });
+//     }
+
+//     // ==============================
+//     // 🔹 TIME HELPERS (IST SAFE)
+//     // ==============================
+//     const timeToMinutes = (timeStr) => {
+//       if (!timeStr) return null;
+//       const [hh, mm] = timeStr.substring(0, 5).split(":").map(Number);
+//       if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+//       return hh * 60 + mm;
+//     };
+
+//     const getISTDate = () => {
+//       return new Date(
+//         new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" })
+//       );
+//     };
+
+//     const istNow = getISTDate();
+//     const nowMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+
+//     const results = [];
+
+//     // ==============================
+//     // 🔹 PROCESS EACH GAME
+//     // ==============================
+//     for (const game of apiResponse.data) {
+//       if (!game?.category_name) continue;
+
+//       const dbGame = await AllGames.findOne(
+//         { name: game.category_name.trim() },
+//         {
+//           startTime: 1,
+//           endTime: 1,
+//           openNo: { $slice: 1 },
+//           closeNo: { $slice: 1 },
+//         }
+//       ).lean();
+
+//       if (!dbGame) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - game not found",
+//         });
+//         continue;
+//       }
+
+//       const openMinutes = timeToMinutes(dbGame.startTime);
+//       const closeMinutes = timeToMinutes(dbGame.endTime);
+
+//       if (openMinutes === null || closeMinutes === null) continue;
+
+//       let openPassed = false;
+//       let closePassed = false;
+
+//       // 🌙 Midnight-safe logic
+//       if (closeMinutes < openMinutes) {
+//         openPassed =
+//           nowMinutes >= openMinutes || nowMinutes < closeMinutes;
+//         closePassed = nowMinutes < closeMinutes;
+//       } else {
+//         openPassed = nowMinutes >= openMinutes;
+//         closePassed = nowMinutes >= closeMinutes;
+//       }
+
+//       // ==============================
+//       // 🔥 FIX GAME DATE (MIDNIGHT CASE)
+//       // ==============================
+//       let gameDate = new Date(istNow);
+
+//       if (closeMinutes < openMinutes && nowMinutes < closeMinutes) {
+//         gameDate.setDate(gameDate.getDate() - 1);
+//       }
+
+//       const istISO = gameDate.toISOString();
+//       const dayName = gameDate.toLocaleDateString("en-IN", {
+//         weekday: "long",
+//       });
+//       const todayDateString = gameDate.toDateString();
+
+//       // ==============================
+//       // 🔹 DUPLICATE CHECK
+//       // ==============================
+//       let isOpenAlreadyUpdated = false;
+//       let isCloseAlreadyUpdated = false;
+
+//       if (dbGame.openNo?.length) {
+//         const lastOpenDate = new Date(
+//           dbGame.openNo[0][2]
+//         ).toDateString();
+//         isOpenAlreadyUpdated = lastOpenDate === todayDateString;
+//       }
+
+//       if (dbGame.closeNo?.length) {
+//         const lastCloseDate = new Date(
+//           dbGame.closeNo[0][2]
+//         ).toDateString();
+//         isCloseAlreadyUpdated = lastCloseDate === todayDateString;
+//       }
+
+//       const updateQuery = {};
+//       const setQuery = { updatedAt: new Date() };
+
+//       // ==============================
+//       // ✅ OPEN UPDATE
+//       // ==============================
+//       if (
+//         openPassed &&
+//         game.value1 &&
+//         game.value2 &&
+//         !isOpenAlreadyUpdated
+//       ) {
+//         updateQuery.$push = {
+//           ...(updateQuery.$push || {}),
+//           openNo: {
+//             $each: [
+//               [
+//                 game.value1,
+//                 game.value2.toString()[0],
+//                 istISO,
+//                 "Open",
+//                 dayName,
+//                 "Trigger",
+//               ],
+//             ],
+//             $position: 0,
+//             $slice: 500,
+//           },
+//         };
+//       }
+
+//       // ==============================
+//       // ✅ CLOSE UPDATE
+//       // ==============================
+//       if (
+//         closePassed &&
+//         game.value3 &&
+//         game.value2 &&
+//         !isCloseAlreadyUpdated
+//       ) {
+//         updateQuery.$push = {
+//           ...(updateQuery.$push || {}),
+//           closeNo: {
+//             $each: [
+//               [
+//                 game.value3,
+//                 game.value2.toString()[1],
+//                 istISO,
+//                 "Close",
+//                 dayName,
+//                 "Trigger",
+//               ],
+//             ],
+//             $position: 0,
+//             $slice: 500,
+//           },
+//         };
+//       }
+
+//       if (!updateQuery.$push) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - already updated or time not passed",
+//         });
+//         continue;
+//       }
+
+//       // ==============================
+//       // 🔹 ATOMIC UPDATE
+//       // ==============================
+//       await AllGames.updateOne(
+//         { _id: dbGame._id },
+//         {
+//           ...updateQuery,
+//           $set: setQuery,
+//         }
+//       );
+
+//       results.push({
+//         game: game.category_name,
+//         status: "updated",
+//       });
+//     }
+
+//     // ==============================
+//     // 🔹 RESPONSE
+//     // ==============================
+//     return res.status(200).json({
+//       success: true,
+//       triggeredBy: isScheduledEvent ? "scheduler" : "manual",
+//       results,
+//     });
+//   } catch (err) {
+//     console.error("❌ API Error:", err);
+//     return res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+// router.post("/api/getGameFormLink", async (req, res) => {
+//   try {
+//     console.log("🚀 Triggered");
+
+//     const isScheduledEvent =
+//       req.body?.["detail-type"] === "Scheduled Event";
+
+//     let url;
+
+//     // ==============================
+//     // 🔹 GET API URL
+//     // ==============================
+//     if (isScheduledEvent) {
+//       const config = await endPointSchemaUrl.findOne({ enabled: true });
+//       url =
+//         config?.url ||
+//         "https://sattamatkadpboss.live/site/liveresults";
+//     } else {
+//       const config = await endPointSchemaUrl.findOne({ enabled: true });
+//       url =
+//         config?.url ||
+//         "https://sattamatkadpboss.live/site/liveresults";
+//       if (!url) {
+//         return res.status(400).json({ error: "URL is required" });
+//       }
+//     }
+
+//     // ==============================
+//     // 🔹 FETCH EXTERNAL API
+//     // ==============================
+//     const response = await fetch(url);
+//     const apiResponse = await response.json();
+
+//     if (!Array.isArray(apiResponse?.data)) {
+//       return res.status(400).json({ error: "Invalid API response format" });
+//     }
+
+//     // ==============================
+//     // 🔹 TIME HELPERS
+//     // ==============================
+//     const timeToMinutes = (timeStr) => {
+//       if (!timeStr) return null;
+//       const [hh, mm] = timeStr.substring(0, 5).split(":").map(Number);
+//       if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+//       return hh * 60 + mm;
+//     };
+
+//     const istNow = new Date(
+//       new Date().toLocaleString("en-US", {
+//         timeZone: "Asia/Kolkata",
+//       })
+//     );
+
+//     const nowMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+//     const istISO = istNow.toISOString();
+//     const dayName = istNow.toLocaleDateString("en-IN", {
+//       weekday: "long",
+//     });
+
+//     const results = [];
+
+//     // ==============================
+//     // 🔹 PROCESS EACH GAME
+//     // ==============================
+//     for (const game of apiResponse.data) {
+//       if (!game?.category_name) continue;
+
+//       const dbGame = await AllGames.findOne(
+//         { name: game.category_name.trim() },
+//         { startTime: 1, endTime: 1 }
+//       ).lean();
+
+//       if (!dbGame) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - game not found",
+//         });
+//         continue;
+//       }
+
+//       const openMinutes = timeToMinutes(dbGame.startTime);
+//       const closeMinutes = timeToMinutes(dbGame.endTime);
+
+//       if (openMinutes === null || closeMinutes === null) continue;
+
+//       // ==============================
+//       // 🔥 MIDNIGHT SAFE (1440 METHOD)
+//       // ==============================
+//       let adjustedNow = nowMinutes;
+//       let adjustedOpen = openMinutes;
+//       let adjustedClose = closeMinutes;
+
+//       if (closeMinutes < openMinutes) {
+//         // Midnight crossing game
+//         adjustedClose += 1440;
+
+//         if (nowMinutes < openMinutes) {
+//           adjustedNow += 1440;
+//         }
+//       }
+
+//       const openPassed = adjustedNow >= adjustedOpen;
+//       const closePassed = adjustedNow >= adjustedClose;
+
+//       const updateQuery = {
+//         $set: { updatedAt: new Date() }
+//       };
+
+//       // ==============================
+//       // ✅ OPEN UPDATE (Only if time passed)
+//       // ==============================
+//       if (openPassed && game.value1 && game.value2) {
+//         updateQuery.$push = {
+//           ...(updateQuery.$push || {}),
+//           openNo: {
+//             $each: [[
+//               game.value1,
+//               game.value2.toString()[0],
+//               istISO,
+//               "Open",
+//               dayName,
+//               "Trigger"
+//             ]],
+//             $position: 0
+//           }
+//         };
+//       }
+
+//       // ==============================
+//       // ✅ CLOSE UPDATE (Only if time passed)
+//       // ==============================
+//       if (closePassed && game.value3 && game.value2) {
+//         updateQuery.$push = {
+//           ...(updateQuery.$push || {}),
+//           closeNo: {
+//             $each: [[
+//               game.value3,
+//               game.value2.toString()[1],
+//               istISO,
+//               "Close",
+//               dayName,
+//               "Trigger"
+//             ]],
+//             $position: 0
+//           }
+//         };
+//       }
+
+//       if (!updateQuery.$push) {
+//         results.push({
+//           game: game.category_name,
+//           status: "skipped - time not passed"
+//         });
+//         continue;
+//       }
+
+//       await AllGames.updateOne(
+//         { _id: dbGame._id },
+//         updateQuery
+//       );
+
+//       results.push({
+//         game: game.category_name,
+//         status: "updated"
+//       });
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       results
+//     });
+
+//   } catch (err) {
+//     console.error("❌ API Error:", err);
+//     return res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
 
 router.post("/api/getGameFormLink", async (req, res) => {
-  const { url, userName, admin } = req.body;
-
   try {
-    const response = await fetch(url);
-    const gamesFromApi = await response.json();
+    console.log("🚀 Triggered");
 
-    if (!Array.isArray(gamesFromApi.data)) {
+    const isScheduledEvent =
+      req.body?.["detail-type"] === "Scheduled Event";
+
+    let url;
+
+    // ==============================
+    // 🔹 GET API URL
+    // ==============================
+    const config = await endPointSchemaUrl.findOne({ enabled: true });
+
+    url =
+      config?.url ||
+      "https://sattamatkadpboss.live/site/liveresults";
+
+    if (!url) {
+      return res.status(400).json({ error: "URL is required" });
+    }
+
+    // ==============================
+    // 🔹 FETCH EXTERNAL API
+    // ==============================
+    const response = await fetch(url);
+    const apiResponse = await response.json();
+
+    if (!Array.isArray(apiResponse?.data)) {
       return res.status(400).json({ error: "Invalid API response format" });
     }
 
-    const today = new Date();
-    const dateKey = today.toISOString().split("T")[0]; // "2025-12-22"
-    const dayName = today.toLocaleDateString("en-US", { weekday: "long" });
+    // ==============================
+    // 🔹 TIME HELPERS
+    // ==============================
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return null;
+      const [hh, mm] = timeStr.substring(0, 5).split(":").map(Number);
+      if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+      return hh * 60 + mm;
+    };
+
+    const istNow = new Date(
+      new Date().toLocaleString("en-US", {
+        timeZone: "Asia/Kolkata",
+      })
+    );
+
+    const nowMinutes = istNow.getHours() * 60 + istNow.getMinutes();
+    const istISO = istNow.toISOString();
+    const today = istISO.split("T")[0];
+    const dayName = istNow.toLocaleDateString("en-IN", {
+      weekday: "long",
+    });
+
     const results = [];
 
-    for (const game of gamesFromApi.data) {
-      const dbGame = await AllGames.findOne({ name: game.category_name });
+    // ==============================
+    // 🔹 PROCESS EACH GAME
+    // ==============================
+    for (const game of apiResponse.data) {
 
-      if (!dbGame) continue;
+      if (!game?.category_name) continue;
 
-      // ✅ Ownership check
-      if (admin !== "Admin" && dbGame.owner !== userName) {
-        results.push({ game: game.category_name, status: "skipped - not owner" });
+      const dbGame = await AllGames.findOne(
+        { name: game.category_name.trim() },
+        { startTime: 1, endTime: 1 }
+      ).lean();
+
+      if (!dbGame) {
+        results.push({
+          game: game.category_name,
+          status: "skipped - game not found",
+        });
         continue;
       }
 
-      // ✅ Process Value2 (e.g., "17" becomes "1" and "7")
-      const openDigit = game.value2 ? game.value2.toString().charAt(0) : "";
-      const closeDigit = game.value2 ? game.value2.toString().charAt(1) : "";
+      const openMinutes = timeToMinutes(dbGame.startTime);
+      const closeMinutes = timeToMinutes(dbGame.endTime);
 
-      // ✅ Create the New Data Arrays
-      const newOpenEntry = [game.value1, openDigit, today.toISOString(), "Open", dayName];
-      const newCloseEntry = [game.value3, closeDigit, today.toISOString(), "Close", dayName];
+      if (openMinutes === null || closeMinutes === null) continue;
 
-      // ✅ Helper function to remove old entries for "Today"
-      const removeToday = (arr) => {
-        if (!Array.isArray(arr)) return [];
-        return arr.filter(entry => entry[2] && !entry[2].startsWith(dateKey));
-      };
+      // ==============================
+      // 🔥 MIDNIGHT SAFE
+      // ==============================
+      let adjustedNow = nowMinutes;
+      let adjustedOpen = openMinutes;
+      let adjustedClose = closeMinutes;
 
-      // ✅ Update Arrays (Remove old today's entry, then add new one at the top)
-      const updatedOpenNo = removeToday(dbGame.openNo);
-      updatedOpenNo.unshift(newOpenEntry);
-
-      const updatedCloseNo = removeToday(dbGame.closeNo);
-      updatedCloseNo.unshift(newCloseEntry);
-
-      // ✅ Save to DB
-      await AllGames.findByIdAndUpdate(
-        dbGame._id,
-        {
-          $set: {
-            openNo: updatedOpenNo,
-            closeNo: updatedCloseNo,
-            updatedAt: new Date()
-          }
+      if (closeMinutes < openMinutes) {
+        adjustedClose += 1440;
+        if (nowMinutes < openMinutes) {
+          adjustedNow += 1440;
         }
-      );
+      }
 
-      results.push({ game: game.category_name, status: "updated" });
+      const openPassed = adjustedNow >= adjustedOpen;
+      const closePassed = adjustedNow >= adjustedClose;
+
+      // ==============================
+      // 🔹 OPEN UPDATE
+      // ==============================
+      if (openPassed && game.value1 && game.value2) {
+
+        const existingOpen = await AllGames.findOne({
+          _id: dbGame._id,
+          openNo: {
+            $elemMatch: {
+              2: { $regex: `^${today}` }
+            }
+          }
+        });
+
+        if (existingOpen) {
+
+          await AllGames.updateOne(
+            {
+              _id: dbGame._id,
+              "openNo.2": { $regex: `^${today}` }
+            },
+            {
+              $set: {
+                "openNo.$": [
+                  game.value1,
+                  game.value2.toString()[0],
+                  istISO,
+                  "Open",
+                  dayName,
+                  "Trigger"
+                ],
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          results.push({
+            game: game.category_name,
+            status: "open updated"
+          });
+
+        } else {
+
+          await AllGames.updateOne(
+            { _id: dbGame._id },
+            {
+              $push: {
+                openNo: {
+                  $each: [[
+                    game.value1,
+                    game.value2.toString()[0],
+                    istISO,
+                    "Open",
+                    dayName,
+                    "Trigger"
+                  ]],
+                  $position: 0
+                }
+              },
+              $set: { updatedAt: new Date() }
+            }
+          );
+
+          results.push({
+            game: game.category_name,
+            status: "open inserted"
+          });
+        }
+      }
+
+      // ==============================
+      // 🔹 CLOSE UPDATE
+      // ==============================
+      if (closePassed && game.value3 && game.value2) {
+
+        const existingClose = await AllGames.findOne({
+          _id: dbGame._id,
+          closeNo: {
+            $elemMatch: {
+              2: { $regex: `^${today}` }
+            }
+          }
+        });
+
+        if (existingClose) {
+
+          await AllGames.updateOne(
+            {
+              _id: dbGame._id,
+              "closeNo.2": { $regex: `^${today}` }
+            },
+            {
+              $set: {
+                "closeNo.$": [
+                  game.value3,
+                  game.value2.toString()[1],
+                  istISO,
+                  "Close",
+                  dayName,
+                  "Trigger"
+                ],
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          results.push({
+            game: game.category_name,
+            status: "close updated"
+          });
+
+        } else {
+
+          await AllGames.updateOne(
+            { _id: dbGame._id },
+            {
+              $push: {
+                closeNo: {
+                  $each: [[
+                    game.value3,
+                    game.value2.toString()[1],
+                    istISO,
+                    "Close",
+                    dayName,
+                    "Trigger"
+                  ]],
+                  $position: 0
+                }
+              },
+              $set: { updatedAt: new Date() }
+            }
+          );
+
+          results.push({
+            game: game.category_name,
+            status: "close inserted"
+          });
+        }
+      }
+
+      if (!openPassed && !closePassed) {
+        results.push({
+          game: game.category_name,
+          status: "skipped - time not passed"
+        });
+      }
     }
 
-    res.status(200).json({ success: true, results });
+    return res.status(200).json({
+      success: true,
+      results
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    console.error("❌ API Error:", err);
+    return res.status(500).json({
+      error: "Internal Server Error"
+    });
   }
 });
+
+
+router.get("/filtered-games", async (req, res) => {
+  try {
+    // 1️⃣ Get config document
+    const config = await endPointSchemaUrl.findOne({ enabled: true }).lean();
+
+    if (!config || !config.ArrayOfGames?.length) {
+      return res.status(200).json({
+        success: true,
+        data: []
+      });
+    }
+
+    // 2️⃣ Convert string IDs to ObjectId
+    const gameIds = config.ArrayOfGames
+
+    // 3️⃣ Fetch only selected games with required fields
+    const games = await AllGames.find(
+      { _id: { $in: gameIds } },
+      {
+        name: 1,
+        startTime: 1,
+        endTime: 1,
+        openNo: { $slice: 1 },
+        closeNo: { $slice: 1 }
+      }
+    ).lean();
+
+    // 4️⃣ Format response (extract index 0 safely)
+    const response = games.map(game => ({
+      name: game.name,
+      startTime: game.startTime,
+      endTime: game.endTime,
+      openNo: game.openNo?.[0] || null,
+      closeNo: game.closeNo?.[0] || null
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: response
+    });
+
+  } catch (error) {
+    console.error("filtered-games error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+
+router.put("/remove-game", async (req, res) => {
+  try {
+    const { gameId } = req.body;
+
+    if (!gameId) {
+      return res.status(400).json({
+        success: false,
+        message: "gameId is required"
+      });
+    }
+
+    const CONFIG_ID = "694f6e962cfbabbd698a2648"; // your document _id
+
+    const updatedDoc = await endPointSchemaUrl.findByIdAndUpdate(
+      CONFIG_ID,
+      {
+        $pull: {
+          ArrayOfGames: gameId
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedDoc) {
+      return res.status(404).json({
+        success: false,
+        message: "Document not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Game removed successfully",
+      data: updatedDoc
+    });
+
+  } catch (error) {
+    console.error("PUT /remove-game error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error"
+    });
+  }
+});
+
+// router.get("/:id", async (req, res) => {
+//   try {
+//     const game = await AllGames.findById(req.params.id);
+//     console.log("Hello I want to execute");
+    
+//     if (!game) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Game not found" });
+//     }
+//     res.json({ success: true, data: game });
+//   } catch (err) {
+//     res.status(500).json({ success: false, message: err.message });
+//   }
+// });
+// router.get("/:id", async (req, res) => {
+//   console.log("hello bro i am getting executed");
+
+//   try {
+//     const game = await AllGames.findById(
+//       req.params.id,
+//       {
+//         name: 1,
+//         owner: 1,
+//         startTime: 1,
+//         endTime: 1,
+//         status: 1,
+//         liveTime: 1,
+//         nameColor: 1,
+//         resultColor: 1,
+//         panelColor: 1,
+//         notificationColor: 1,
+//         fontSize: 1,
+//         openNo: { $slice: 50 },
+//         closeNo: { $slice: 50 },
+//         resultNo: { $slice: 50 },
+//         IsNotification: 1,
+//       }
+//     );
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Fetched game data successfully",
+//       data: game,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to fetch game data",
+//       error: error.message,
+//     });
+//   }
+// });
+router.get("/:id", async (req, res) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+
+    const pageNumber = parseInt(page);
+    const limitNumber = parseInt(limit);
+
+    const skip = (pageNumber - 1) * limitNumber;
+    const totalRecords = await AllGames.findById(req.params.id).select(
+      "openNo",
+    );
+
+    const totalLength = totalRecords.openNo.length;
+
+    const totalPages = Math.ceil(totalLength / limitNumber);
+
+    const game = await AllGames.findById(req.params.id, {
+      name: 1,
+      owner: 1,
+      startTime: 1,
+      endTime: 1,
+      status: 1,
+      liveTime: 1,
+      nameColor: 1,
+      resultColor: 1,
+      panelColor: 1,
+      notificationColor: 1,
+      fontSize: 1,
+      IsNotification: 1,
+
+      // ✅ PAGINATION HERE
+      openNo: { $slice: [skip, limitNumber] },
+      closeNo: { $slice: [skip, limitNumber] },
+      resultNo: { $slice: [skip, limitNumber] },
+    });
+
+    res.status(200).json({
+      success: true,
+      currentPage: pageNumber,
+      totalPages,
+      totalRecords: totalLength,
+      limit: limitNumber,
+      data: game,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch game data",
+      error: error.message,
+    });
+  }
+});
+
+
+// router.get("/:id", async (req, res) => {
+//   try {
+//     const { page = 1, limit = 200 } = req.query;
+
+//     const skip = (page - 1) * limit;
+
+//     const game = await AllGames.findById(req.params.id)
+//       .select("name openNo closeNo noOfDays")
+//       .lean();
+
+//     if (!game) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Game not found",
+//       });
+//     }
+
+//     const paginatedOpen = game.openNo.slice(skip, skip + Number(limit));
+//     const paginatedClose = game.closeNo.slice(skip, skip + Number(limit));
+
+//     res.json({
+//       success: true,
+//       data: {
+//         name: game.name,
+//         noOfDays: game.noOfDays,
+//         openNo: paginatedOpen,
+//         closeNo: paginatedClose,
+//         totalOpen: game.openNo.length,
+//         totalClose: game.closeNo.length,
+//         page: Number(page),
+//       },
+//     });
+//   } catch (err) {
+//     res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// });
 
 router.put("/updateFull/:id", async (req, res) => {
   try {
@@ -1107,8 +2466,10 @@ router.put("/updateFull/:id", async (req, res) => {
       status,
       liveTime,
       fontSize,
+      IsNotification,
     } = req.body;
-
+    console.log("called me ");
+    
     // Find game
     const game = await AllGames.findById(gameId);
     if (!game) {
@@ -1131,6 +2492,7 @@ router.put("/updateFull/:id", async (req, res) => {
     if (status) game.status = status;
     if (liveTime !== undefined) game.liveTime = Number(liveTime);
     if (fontSize !== undefined) game.fontSize = Number(fontSize);
+    if (IsNotification) game.IsNotification = IsNotification;
 
     // OPTIONAL — update resultNo if provided
     if (resultNo) {

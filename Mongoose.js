@@ -1,24 +1,21 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-const DataBaseConnect = async () => {
+let isConnected = false;
+
+export const connectDB = async () => {
   try {
-    // Get connection string from environment variables
-    const uri = process.env.MONGO_URI;
-
-    if (!uri) {
-      throw new Error("MONGO_URI is not defined in environment variables");
+    if (isConnected) {
+      return;
     }
 
-    await mongoose.connect(uri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+    const conn = await mongoose.connect("mongodb+srv://dengeramprkash:FStqAMvgbejjutf4@cluster0.0usngiq.mongodb.net", {
+      serverSelectionTimeoutMS: 8000,
     });
 
-    console.log("✅ Connected to MongoDB Atlas");
+    isConnected = conn.connections[0].readyState === 1;
+    console.log("✅ MongoDB Connected");
   } catch (error) {
-    console.error("❌ Something went wrong while connecting to DB:", error);
-    process.exit(1); // Exit process if DB connection fails
+    console.error("❌ MongoDB connection error:", error.message);
+    throw error;
   }
 };
-
-module.exports = DataBaseConnect;
