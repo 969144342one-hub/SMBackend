@@ -13,6 +13,30 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+
+const entrySchema = new mongoose.Schema({
+  day: { type: String, required: true }, // "Monday", "Tuesday" etc
+  // Each day has up to 4 columns (like the image)
+  columns: [
+    {
+      panel: { type: String, default: "" },  // 3-digit e.g. "689"
+      jodi:  { type: String, default: "" },  // 2-digit e.g. "35"
+      digit: { type: String, default: "" },  // 1-digit e.g. "3"
+    },
+  ],
+});
+ 
+const guessingChartSchema = new mongoose.Schema(
+  {
+    gameId:        { type: mongoose.Schema.Types.ObjectId, ref: "AllGame", required: true },
+    gameName:      { type: String, required: true },
+    noOfDays:      { type: Number, enum: [5, 6, 7], required: true },
+    weekStartDate: { type: Date, required: true }, // always Monday
+    entries:       [entrySchema],
+  },
+  { timestamps: true }
+);
+
 const allGamesSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, unique: true },
@@ -111,9 +135,10 @@ const AgentList = mongoose.model("AgentList", AgentListSchema);
 
 const endPointSchemaUrl = mongoose.model("Endpoint", endpointSchema);
 
+const GuessingChart = mongoose.model("GuessingChart", guessingChartSchema);
 
 // Export them (ESM way)
-export { User, AllGames, LiveResult, PayMentBalanceRate, Notification, AgentList, endPointSchemaUrl };
+export { User, AllGames, GuessingChart, LiveResult, PayMentBalanceRate, Notification, AgentList, endPointSchemaUrl };
 
 // Export them (ESM way)
 // export { User, AllGames, LiveResult, PayMentBalanceRate, Notification, AgentList };

@@ -1,12 +1,21 @@
 import express from "express";
 import fetch from "node-fetch";
 import jwt from "jsonwebtoken";
-import { AllGames, endPointSchemaUrl } from "../Module.js";
+import { AllGames, endPointSchemaUrl, GuessingChart } from "../Module.js";
 import dayjs from "dayjs";
 
 // import { JWT_SECRET } from "../config.js"
 
 const router = express.Router();
+
+const getMonday = (date) => {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 /* =========================================================
    🔹 INTERNAL SHARED FUNCTION (NO API CALL ❌)
@@ -634,6 +643,107 @@ router.put("/setLiveTime/:id", async (req, res) => {
       message: "Failed to set live time",
       error: err.message,
     });
+  }
+});
+
+router.post("/save", async (req, res) => {
+  try {
+    const { gameId, noOfDays, weekStartDate, entries } = req.body;
+ 
+    if (!gameId || !noOfDays || !weekStartDate || !entries) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+ 
+    // Fetch game name from existing games collection
+    const game = await AllGames.findById(gameId);
+    if (!game) {
+      return res.status(404).json({ success: false, message: "Game not found" });
+    }
+ 
+    const monday = getMonday(new Date(weekStartDate));
+ 
+    // Upsert: if chart exists for this game+week, update it
+    const chart = await GuessingChart.findOneAndUpdate(
+      { gameId, weekStartDate: monday },
+      {
+        gameId,
+        gameName: game.name,
+        noOfDays: Number(noOfDays),
+        weekStartDate: monday,
+        entries,
+      },
+      { upsert: true, new: true }
+    );
+ 
+    return res.json({ success: true, message: "Guessing chart saved", data: chart });
+  } catch (err) {
+    console.error("Error saving guessing chart:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+ 
+// ─────────────────────────────────────────
+// GET /guessing/all
+// Get latest guessing chart for every game (for display page)
+// ─────────────────────────────────────────
+router.get("/all", async (req, res) => {
+  try {
+    // Get the latest chart per game using aggregation
+    const charts = await GuessingChart.aggregate([
+      { $sort: { weekStartDate: -1 } },
+      {
+        $group: {
+          _id: "$gameId",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+      { $replaceRoot: { newRoot: "$doc" } },
+      { $sort: { gameName: 1 } },
+    ]);
+ 
+    return res.json({ success: true, data: charts });
+  } catch (err) {
+    console.error("Error fetching all guessing charts:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+ 
+// ─────────────────────────────────────────
+// GET /guessing/:gameId
+// Get latest guessing chart for one game
+// ─────────────────────────────────────────
+router.get("/:gameId", async (req, res) => {
+  try {
+    const chart = await GuessingChart.findOne(
+      { gameId: req.params.gameId },
+      null,
+      { sort: { weekStartDate: -1 } }
+    );
+ 
+    if (!chart) {
+      return res.status(404).json({ success: false, message: "No guessing chart found" });
+    }
+ 
+    return res.json({ success: true, data: chart });
+  } catch (err) {
+    console.error("Error fetching guessing chart:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+ 
+// ─────────────────────────────────────────
+// DELETE /guessing/:gameId
+// Delete latest guessing chart for a game
+// ─────────────────────────────────────────
+router.delete("/:gameId", async (req, res) => {
+  try {
+    await GuessingChart.findOneAndDelete(
+      { gameId: req.params.gameId },
+      { sort: { weekStartDate: -1 } }
+    );
+    return res.json({ success: true, message: "Deleted successfully" });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
